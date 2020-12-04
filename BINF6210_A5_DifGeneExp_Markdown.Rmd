@@ -1,0 +1,103 @@
+---
+title: "Methods of Differential Gene Expression Analysis"
+author: "Lisa Hoeg, 1151916"
+date: "BINF6210 A5: due Dec. 11, 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Introduction
+
+Initializing document as a template to be filled in as the project is completed.
+
+From the assignment details: 
+"short written section of 2-3 paragraphs: 10%"
+"Which of these types of projects are you conducting? And, what is the objective of your project? Aim to cite 2-4 suitable references in your introduction. You may use any of the references uploaded to CourseLink or other literature you find on your topic."
+"Please note that I would consider a “paragraph” to be approximately between one- quarter page and one-half page of text, using single spacing and 12-point font."
+"Paragraph 1: What is the overarching topic you are interested in? Why is this scientifically important and interesting and/or societally relevant?"
+"Paragraph 2: You can outline what is an important sub-area of research or a gap in knowledge. (As an example, perhaps your broader theme is gene expression analysis, and in paragraph 2 you could narrow in to introduce the importance of statistical choices.)"
+"Paragraph 3: What is the specific objective of your study? What kind of study are you performing? What will you do?"
+
+
+# 2. Description of Data Set
+
+From the assignment details:
+10%
+"Provide a short written description of your data set. What data set have you chosen to analyze to address your question? Describe the data set. Where are the data from, e.g. from the literature? from a public data base? On what date did you obtain the data? How did you obtain the data? What are the properties of the data set? How many samples are there, and what are the key variables you are interested in? If you are comparing groups (e.g. treatments, organisms, cell types, genes), describe the nature of the groups that you are comparing. Cite the source of the data set."
+"Depending upon the size of the data set, you may consider analyzing only a subset here, to keep the project scope in check."
+
+
+# 3. Code Section 1 – Data Acquisition, Exploration, Filtering, and Quality Control
+
+From the assignment details:
+25%
+"Whenever possible, include code for data acquisition for your project. Also, include all data files needed for analysis with your submission."
+"After data acquisition, you will next conduct data exploration, filtering, and quality control."
+"For RNA-Seq data, you should examine library size among samples and make a suitable analytical choice that takes into account variability in library size. A suitable plot for that type of analysis could be to plot gene expression levels before vs. after normalization (e.g. see example script we used in class for one option). You should also explicitly consider how you will choose to treat lowly-expressed genes for your project."
+"In general, for your project, think (and read) about: What can go wrong with the type of data you are analyzing? And, what types of variability might be expected in that type of data?"
+"Also, make a deliberate decision about how you will treat missing data for your project. Will you focus on genes or traits with a good sample size, for example? Do you need complete cases (e.g. can you only include species having sequence data for each of two genes)? If suitable for your project, you may consider incorporating imputation techniques."
+"Your data exploration and quality control section should include at least 2 figures and a maximum of 3 figures"
+"Please comment your code well. You do not need to explain syntax. Rather, you should explain what you are doing and why at each step. Why did you make a particular choice? Provide a brief justification for choices you have made for arguments to the functions you are using (whether you use the default or not)"
+"I would expect that, in most cases, 2-3 pages worth of high-quality, commented code will suffice for each of the code sections. As well, please note that high-quality code is often more concise than early-draft code. For example, can you reduce redundancy by using an apply function, foreach(), a for loop or while loop (if suitable), or writing your own function?"
+"Remember to put “sanity checks” into your code. Are your data filtering steps and preliminary analysis steps doing what you want?"
+
+
+# 4. Main Software Tools Description
+
+From the assignment details:
+1 paragraph: 5%
+"Why did you make this choice? What are the expected strengths and weaknesses of the tool you chose? Did you consider any alternatives? Cite the authors of the tool you used (you can cite the package itself plus the relevant associated publication, if available). If you are conducting a methodological project involving a comparison of tools, you might briefly describe two main tools in this section. Otherwise, you will typically describe one main software tool."
+"Also, in this section, make it clear how you built upon existing vignettes for conducting your project."
+
+
+# 5. Code Section 2 – Main Analysis
+
+From the assignment details:
+25%
+"What would go in this section would depend upon your project, e.g.: writing code to build and test a classifier, build visualizations to explore ideas, conduct a statistical test of a biological hypothesis, or explore the impact of methodological choices upon results"
+"Your main analysis section must also include a minimum of 2 figures and a maximum of 3 figures."
+"Please see the guidelines for code section #1 above. The same general messages apply, including to focus upon quality, not length, and to comment your code well, etc."
+
+
+# 6. Quality of Visualizations
+
+From assignment details:
+20%
+"Throughout, ensure that your figures are clear and well labeled. Even for simple figures, such as histograms, ensure that you have accurate, informative axis labels. Also, consider readability, visual appeal, and accessibility. Use well-differentiated colours, and avoid relying upon the red- green spectrum to convey scientifically important information. Remember, you can consider using a combination of colour and symbol/pattern to convey your meaning. The grade in this section is based upon quality and novelty, not having the maximum permissible number of figures. You should have a total of 4-6 figures for your project (excluding the bonus section, should you choose to complete that section)."
+
+
+# 7. Bonus Section (Optional)
+
+From the assignment details:
+"An example of a topic that could go here would be benchmarking your analysis for computational speed and/or for accuracy (against comparator tools). Or, you could include supplementary statistical testing (e.g. testing whether your results are sensitive to your analytical choices in your main analysis section). You could also include supplementary visualizations of your choosing."
+"The maximum length of this section is 2 pages of your final PDF assignment. Any content above the two-page limit for this section will not be graded. This could consist of prose, commented code, statistical results, and/or visualizations (your choice)."
+
+
+# 8. Results and Discussion
+
+From the assignment details:
+"short written section of 2-3 paragraphs: 10%"
+"Paragraph 1: Return to your original question. What is the answer to your question? What did you discover? Were your results as expected or not?"
+"Paragraph 2: Briefly describe any key caveats of your study. For example, are the conclusions that can be drawn limited by sample size or any other concerns? Were there biases in data availability that could have impacted your project?"
+"Paragraph 3: What would be the next steps for this research? What would you do next if you had more time and if you were going to develop this work into a larger project? Did your results reveal any interesting preliminary findings that would be worthy of follow-up study?"
+"I suggest that you consider citing 2-4 references in your discussion section to help with
+interpretation of your results. You may cite references that you also cited in your introduction"
+"At the end, I also encourage you to add an additional short paragraph reflecting upon the process of completing this assignment. What did you learn through completing your project? What lessons will you take forward in your future coursework and career? Reflection can help us to solidify our learning and help us to act upon what we have learned in the future. This additional, optional paragraph is not included in the 3-paragraph length limit for this section."
+
+# 9. Acknowledgements
+
+Add any necessary acknowledgements here
+
+
+# 10. References
+
+From the assignment details:
+" I suggest consulting and citing 3-6 papers from the literature to help you to develop your idea and/or interpret your results. Ten papers from the literature is the hard maximum for citations, reflecting that you have other assignments and commitments and to encourage some academics/life balance"
+"Additional citations for vignettes, other tutorials, StackOverflow posts, etc., are not included in the 10-reference limit. You must cite all such sources."
+"You would include scientific references as an in-text citation in the relevant sentence of your assignment, i.e. introduction or discussion (e.g. Xu et al. 2020). Also, list the full reference here at the end. If you used any specific online tutorials or a specific StackOverflow posting, for example, you must also include those here."
+
+
+
