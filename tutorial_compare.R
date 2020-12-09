@@ -231,7 +231,7 @@ dists_dge <- dist(t(DGE_Filt_N$counts), diag = TRUE, upper = TRUE)
 DGE_CMD <- as.data.frame(cmdscale(dists_dge))
 
 plot_DGE <- ggplot(DGE_CMD, aes(x = V1, y = V2, color = groups, shape = groups)) +
-  geom_point(size = 3) + coord_fixed() + ggtitle("MDS with Untransformed data (DGE)")
+  geom_point(size = 3) + coord_fixed() + ggtitle("MDS with DGE Object")
 plot_DGE
 
 #The untransformed DDS for comparison:
@@ -239,7 +239,7 @@ dists_dds <- dist(t(assay(DDS_Filt_N)), diag = TRUE, upper = TRUE)
 DDS_CMD <- as.data.frame(cmdscale(dists_dds))
 
 plot_DDS <- ggplot(DDS_CMD, aes(x = V1, y = V2, color = groups, shape = groups)) +
-  geom_point(size = 3) + coord_fixed() + ggtitle("MDS with Untransformed data (DDS)")
+  geom_point(size = 3) + coord_fixed() + ggtitle("MDS with DDS Object")
 plot_DGE
 
 grid.arrange(plot_DDS, plot_DGE, plot_DDSRlog, plot_DDSvst, nrow = 2, top = "MDS plots with transformations on DESeqDataSet and DGEList")
@@ -287,6 +287,11 @@ top_p_ER
 #The first step does the estimation of size factors, dispersion estimate, and GLM fitting all internally, and thus uses the non-normalized dataset as the input. The reason the tutorial had done data normalization and transformations previously was to be able to do preliminary investigations and visualizations
 DESeq.CONvsGF <- DESeq(DDS_Filt)
 
+#If I want to find the dispersion estimate, I can use the estimateDispersions function on the normalized data:
+DDS_Disp <- estimateDispersions(DDS_Filt_N)
+plotDispEsts(DDS_Disp)
+#This looks similar to the one produced by EdgeR, but I'm not quite sure I understand what makes them different yet.
+
 #The results function extracts a results table from the DESeq object
 res_DS.CONvsGF <- results(DESeq.CONvsGF)
 class(res_DS.CONvsGF)
@@ -305,6 +310,7 @@ top_p_padj
 #Same top 10
 
 top_p_both <- intersect(top_p_DS, top_p_ER)
+top_p_both
 #This shows that 5/10 genes with the most significant p-values are the same in both methods.
 
 #The DESeq tutorial filters out any genes with a padj of 0.1 or greater to represent a FDR of 10%
@@ -319,14 +325,88 @@ ER_p10 <-subset(res_ER.CONvsGF$table, PValue < 0.1)
 top_down_ER <- row.names(head(ER_p10[order(ER_p10$logFC), ], 30))
 top_up_ER <- row.names(head(ER_p10[order(ER_p10$logFC, decreasing = TRUE), ], 30))
 
-top_down_both <- intersect(top_up_DS, top_up_ER)
+top_down_both <- intersect(top_down_DS, top_down_ER)
 top_down_both #No overlap
 
-top_up_both <- intersect(top_down_DS, top_down_ER)
+top_up_both <- intersect(top_up_DS, top_up_ER)
 top_up_both #No overlap
 
 #This is interesting that the 30 most differentially expressed genes up and down according to the logfold change are unique for each method.
 
+
+#### Compare to Original Results ----
+
+#This is the link to download their results, so I can compare what I get to their final product
+#Results_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file", "file=GSE114702_Processed_data_file_2_-_DESeq2_results.xlsx", sep="&")
+#download.file(Results_URL, "GSE114702_DESeq2_results.xlsx")
+
+#install.packages("readxl")
+library(readxl)
+
+sheets <- excel_sheets("GSE114702_DESeq2_results.xlsx")
+res_OG.CONvsGF <- read_excel("GSE114702_DESeq2_results.xlsx", sheet = sheets[1], na = "NA")
+#there are a few warnings reading in the spreadsheet that show Excel formatted a number into a date.
+class(res_OG.CONvsGF)
+res_OG.CONvsGF <- as.data.frame(res_OG.CONvsGF)
+head(res_OG.CONvsGF)
+colnames(res_OG.CONvsGF)
+rownames(res_OG.CONvsGF) <- res_OG.CONvsGF$`Ensembl Gene ID`
+
+sum(is.na(res_OG.CONvsGF$padj))
+sum(is.na(res_OG.CONvsGF$`Associated Gene Name`))
+sum(is.na(res_OG.CONvsGF$log2FoldChange))
+
+top_padj_OG <- row.names(head(res_OG.CONvsGF[order(res_OG.CONvsGF$padj), ], 10))
+top_padj_OG
+
+top_p_all <- intersect(intersect(top_p_DS, top_p_ER), top_padj_OG)
+top_p_all #4/10 same
+
+#Try comparing logFC values:
+OG_p10 <-res_OG.CONvsGF[res_OG.CONvsGF$padj < 0.1,]
+top_down_OG <- row.names(head(OG_p10[order(OG_p10$log2FoldChange), ], 30))
+top_up_OG <- row.names(head(OG_p10[order(OG_p10$log2FoldChange, decreasing = TRUE), ], 30))
+
+top_down_OG.DS <- intersect(top_down_OG, top_down_DS)
+top_down_OG.DS #12/30 overlap
+
+top_down_OG.ER <- intersect(top_down_OG, top_down_ER)
+top_down_OG.ER #no ovrelap
+
+top_up_OG.DS <- intersect(top_up_OG, top_up_DS)
+top_up_OG.DS #23/30 overlap
+
+top_up_OG.ER <- intersect(top_up_OG, top_up_ER)
+top_up_OG.ER #no overlap
+
+#As expected since the original paper used DESeq2 for their analysis, there is greater consistency between their results and my results in DESeq2 than my results in EdgeR, but it is unexpected that there is no overlap at all between the EdgeR analysis.
+
+
+#### Results visualizations ---- 
+
 #Both methods use a heat map visualization on the results data: 
 #EdgeR tutorial does CPM on dispersion data of the top 30 genes according to p-value, and uses the results in the heatmap
 #DESeq2 tutorial only did a heat map with the top 20 genes in terms of variance across the samples, using the vst data, not the results. Following along with the EdgeR tutorial, let's try to do the same
+
+#Starts with test whether DE is above a certain threshold.
+#tutorial uses log2(1.5) as the cutoff, but this could be a good point to try different values.
+
+res_ER_lfc1.5 <-glmTreat(fit_dgeglm, contrast = EdgeR.CONvsGF, lfc = log2(1.5))
+topTags(res_ER_lfc1.5)
+#Can see that a number of the ENSEMBL gene IDs do not have Entrez mappings or symbols. Since the results for the original paper does not have any missing gene symbols, I might wish to filter those out at the beginning, see how it impacts the results
+
+#To visualize the top genes with a heatmap, first the data must be converted to log2-CPM. The tutorial uses the most recent DGEList object for this purpose:
+logCPM_ER <- cpm(DGE_Disp, prior.count = 2, log = TRUE)
+rownames(logCPM_ER) <- DGE_Disp$genes$Entrez_ID
+colnames(logCPM_ER) <- paste(DGE_Disp$samples$group, 1:2, sep = "-")
+
+#The tutorial chooses the top 30 DE genes from the TREAT test above, then makes the heatmap of those genes:
+ordered_genes <- order(res_ER_lfc1.5$table$PValue)
+logCPM_ER <- logCPM_ER[ordered_genes[1:30],]
+
+coolmap(logCPM_ER, margins = c(7,7), lhei = c(1,6), lwid = c(1,3))
+#Error: figure margins too large. might try to fix
+
+
+#Try a heatmap for DDS
+#Compare to heatmap in original paper
