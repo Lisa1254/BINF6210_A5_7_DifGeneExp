@@ -240,7 +240,7 @@ DDS_CMD <- as.data.frame(cmdscale(dists_dds))
 
 plot_DDS <- ggplot(DDS_CMD, aes(x = V1, y = V2, color = groups, shape = groups)) +
   geom_point(size = 3) + coord_fixed() + ggtitle("MDS with DDS Object")
-plot_DGE
+plot_DDS
 
 grid.arrange(plot_DDS, plot_DGE, plot_DDSRlog, plot_DDSvst, nrow = 2, top = "MDS plots with transformations on DESeqDataSet and DGEList")
 
@@ -397,16 +397,29 @@ topTags(res_ER_lfc1.5)
 
 #To visualize the top genes with a heatmap, first the data must be converted to log2-CPM. The tutorial uses the most recent DGEList object for this purpose:
 logCPM_ER <- cpm(DGE_Disp, prior.count = 2, log = TRUE)
-rownames(logCPM_ER) <- DGE_Disp$genes$Entrez_ID
-colnames(logCPM_ER) <- paste(DGE_Disp$samples$group, 1:2, sep = "-")
+rownames(logCPM_ER) <- DGE_Disp$genes$Symbol
+
 
 #The tutorial chooses the top 30 DE genes from the TREAT test above, then makes the heatmap of those genes:
 ordered_genes <- order(res_ER_lfc1.5$table$PValue)
 logCPM_ER <- logCPM_ER[ordered_genes[1:30],]
 
-coolmap(logCPM_ER, margins = c(7,7), lhei = c(1,6), lwid = c(1,3))
-#Error: figure margins too large. might try to fix
+#coolmap is a function of limma package, which is loaded in through EdgeR
+coolmap(logCPM_ER)
+
+#DESeq2 tutorial uses pheatmap for heatmap
+library(pheatmap)
+pheatmap(logCPM_ER)
 
 
 #Try a heatmap for DDS
-#Compare to heatmap in original paper
+res_DS_lfc1.5 <- subset(res_DS.CONvsGF, log2FoldChange >1.5)
+logCPM_DS <- cpm(DDS_Disp, prior.count = 2, log = 2)
+ordered_genes_DS <- order(res_DS_lfc1.5$padj)
+logCPM_DS <- logCPM_DS[ordered_genes_DS[1:30],]
+
+coolmap(logCPM_DS)
+pheatmap(logCPM_DS)
+#Not sure if I did something wrong, but there appears to be very little variation between the samples, and the biological replicates aren't even grouped fully together, with CON.P4 being apparently closest to GF.P2?
+
+#Compare to heatmap in original paper - only heatmap in original paper was for SI mice, so might switch to SI mice for assignment.
