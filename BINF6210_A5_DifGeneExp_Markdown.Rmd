@@ -227,11 +227,9 @@ DS_Counts_N$sizeFactor
 Data Visualization
 ``` {r visual-cpm}
 # SAy something about this
-#Fix labels and other graph details
+#Fix labels and other graph details. Doesn't matter which count object you put in here, either will produce the same
 DS_AveLogCPM <- aveLogCPM(DS_Counts)
 hist(DS_AveLogCPM)
-ER_AveLogCPM <- aveLogCPM(ER_Counts)
-hist(ER_AveLogCPM)
 ```
 
 ``` {r visual-mds}
@@ -257,7 +255,98 @@ Some more stuff to type
 
 ## 5. Code Section 2 – Main Analysis
 
+Differential Gene Expression
+``` {r de-edger}
+# EdgeR
+# First constructs a contrast matrix. This step seems most relevant when there are multiple possible contrasts in the complete data set, but as I have only retained naive mice for CON and GF types, it is basically just reformatting the existing design
+ER.CONvsGF <- makeContrasts(CON-GF, levels = ER_des.m)
+class(ER.CONvsGF)
+ER.CONvsGF
 
+# Estimates dispersion by maximizing negative binomial likelihood
+ER_Disp <- estimateDisp(ER_Counts_N, ER_des.m, robust=TRUE)
+
+# EdgeR uses the dispersion to estimate the GLM for each gene
+ER_fit <- glmQLFit(ER_Disp, ER_des.m, robust=TRUE)
+
+#The results are then calculated using the contrast matrix and the GLM fit
+res_ER <- glmQLFTest(ER_fit, contrast = ER.CONvsGF)
+class(res_ER)
+colnames(res_ER$table)
+topTags(res_ER)
+#The top tags are listed by order of lowest p-value
+
+#Identify the top 10 genes by p-value for comparison with the DESeq method
+top_p_ER <- row.names(topTags(res_ER))
+top_p_ER
+```
+
+``` {r de-deseq, message = FALSE}
+# DESeq2
+# The first step does the estimation of size factors, dispersion estimate, and GLM fitting all internally, and thus uses the non-normalized dataset as the input. The reason the tutorial had done data normalization and transformations previously was to be able to do preliminary investigations and visualizations
+DS.CONvsGF <- DESeq(DS_Counts)
+
+# The results function extracts a results table from the DESeq object
+res_DS <- results(DS.CONvsGF)
+class(res_DS)
+colnames(res_DS)
+
+#Identify the top 10 genes by p-value for comparison with the EdgeR method
+top_p_DS <- row.names(head(res_DS[order(res_DS$pvalue), ], 10))
+top_p_DS
+```
+
+``` {r de-orig, message = FALSE, warning = FALSE}
+# Compare to results from original paper
+# Download results spreadsheet
+#Results_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file", "file=GSE114702_Processed_data_file_2_-_DESeq2_results.xlsx", sep="&")
+#download.file(Results_URL, paste0(dir, "GSE114702_DESeq2_results.xlsx"))
+
+# Locate correct sheet for comparison
+sheets <- excel_sheets(paste0(dir, "GSE114702_DESeq2_results.xlsx"))
+res_OG <- read_excel(paste0(dir, "GSE114702_DESeq2_results.xlsx"), sheet = sheets[5], na = "NA")
+# There are a few warnings reading in the spreadsheet that show Excel formatted a number into a date. Comparing the cells with warnings in spreadsheet to the dataframe in R, the cells belong to the "% GC content" variable, and seem to have an expected value R's dataframe. Since this analysis does not use % GC content, I will ignore it, but if it was part of the analysis, I might consider replacing those cells iwth NAs to be safe.
+
+# Check and format results
+class(res_OG)
+res_OG <- as.data.frame(res_OG)
+head(res_OG)
+colnames(res_OG)
+rownames(res_OG) <- res_OG$`Ensembl Gene ID`
+
+sum(is.na(res_OG$padj))
+sum(is.na(res_OG$`Associated Gene Name`))
+sum(is.na(res_OG$log2FoldChange))
+
+#
+top_p_OG <- row.names(head(res_OG[order(res_OG$pvalue), ], 10))
+top_p_OG
+
+```
+
+```{r compare-de}
+top_p_both <- intersect(top_p_DS, top_p_ER)
+top_p_both
+
+top_p_OG_DS <- intersect(top_p_OG, top_p_DS)
+top_p_OG_DS
+
+top_p_OG_ER <- intersect(top_p_OG, top_p_ER)
+top_p_OG_ER
+
+top_p_all <- intersect(intersect(top_p_DS, top_p_ER), top_p_OG)
+top_p_all
+```
+``` {r is-de}
+#Next the tutorial estimated the false discovery rate. From the documentation, "Identify which genes are significantly differentially expressed from an edgeR fit object containing p-values and test statistics."
+ER_de <- decideTestsDGE(res_ER, p.value = 0.1)
+class(ER_de)
+summary(ER_de)
+#Zero? 
+```
+
+Visualizations
+Add some stuff from the vs package.
 
 ##6. Quality of Visualizations
 
@@ -294,12 +383,9 @@ Add any necessary acknowledgements here
 
 ## 10. References
 
-From the assignment details:
-" I suggest consulting and citing 3-6 papers from the literature to help you to develop your idea and/or interpret your results. Ten papers from the literature is the hard maximum for citations, reflecting that you have other assignments and commitments and to encourage some academics/life balance"
+### Academic References
 
-"Additional citations for vignettes, other tutorials, StackOverflow posts, etc., are not included in the 10-reference limit. You must cite all such sources."
-
-"You would include scientific references as an in-text citation in the relevant sentence of your assignment, i.e. introduction or discussion (e.g. Xu et al. 2020). Also, list the full reference here at the end. If you used any specific online tutorials or a specific StackOverflow posting, for example, you must also include those here."
+### Coding References
 
 
 
