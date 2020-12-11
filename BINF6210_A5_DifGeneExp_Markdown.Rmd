@@ -7,7 +7,8 @@ output: pdf_document
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(message = FALSE, tidy.opts = list(width.cutoff=60))
+knitr::opts_chunk$set(tidy = TRUE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=88))
 ```
 
 ## 1. Introduction
@@ -38,11 +39,10 @@ Probably I should say something here.
 
 
 ## 3. Code Section 1 – Data Acquisition, Exploration, Filtering, and Quality Control
-Note: only coding of interest to the assignment and their outputs will be displayed in this section. A number of simple commands, such as loading libraries and "sanity checks" like verifying the class of an object will make use of the "include = FALSE" option to keep the output document easy to read. The full code will be present at the end of the PDF for grading purposes.
 
 Preliminary Set-up & Data Acquisition
 
-``` {r libraries, results = "hide"}
+``` {r libraries, message = FALSE}
 # All libraries were loaded at the beginning of the script for efficient organization.
 #install.packages("stringr")
 library(stringr)
@@ -62,7 +62,7 @@ library(readxl)
 library(vidger)
 ```
 
-```{r set-dir, results = "hide"}
+```{r set-dir}
 # A variable, "dir" is used to define the working directory
 # Keeping this here for now, before submitting delete this comment and change to empty string: ""
 # User can specify directory here for downloading and saving files, or leave empty
@@ -77,9 +77,7 @@ dir <- "/Users/lisa/Documents/Bioinformatics/6210/A5/scripts_data/a5_data/"
 
 # Read in file; first column is the gene identifiers, which will be used for row names
 countdata_mice <- read.delim(paste0(dir, "GSE114702_HTSeq_gene_counts.txt.gz"), row.names = 1)
-```
 
-```{r load-checks, include = FALSE}
 # Check data loaded as expected:
 class(countdata_mice)
 colnames(countdata_mice)
@@ -113,8 +111,7 @@ col_S_CON_GF <- lapply(c("CON.S", "GF.S"), FUN = function(x) replicate_sample(sa
 col_S_CON_GF <- unlist(col_S_CON_GF)
 # Subsetting data
 counts_S_CON_GF <- countdata_mice[,col_S_CON_GF]
-```
-``` {r subset-check, include = FALSE}
+
 # Check
 colnames(counts_S_CON_GF)
 # Remove variable no longer needed
@@ -127,23 +124,21 @@ Format Count and Annotation Data
 group_data <- str_remove(colnames(counts_S_CON_GF), pattern = ".S[0-9]+")
 group_data <- factor(group_data)
 coldata_mice <- data.frame(Group = group_data)
-```
 
-``` {r col-annot-check, include = FALSE}
+# Check
 group_data
 table(group_data)
 class(coldata_mice)
 ```
 
-``` {r row-annot}
+``` {r row-annot, message = FALSE}
 # EdgeR uses a dataframe to provide gene annotation information to the rows
 # I'll use Entrez IDs and gene symbols
 entrez_id_anot <- mapIds(org.Mm.eg.db, rownames(counts_S_CON_GF), keytype = "ENSEMBL", column = "ENTREZID")
 symbols_anot <- mapIds(org.Mm.eg.db, rownames(counts_S_CON_GF), keytype = "ENSEMBL", column = "SYMBOL")
 gene_mice <- data.frame(Entrez_ID = entrez_id_anot, Symbol = symbols_anot)
-```
 
-``` {r row-an-check, include = FALSE}
+#Check
 head(gene_mice, 3)
 class(gene_mice)
 # Remove unneeded variables
@@ -155,9 +150,8 @@ rm(entrez_id_anot, symbols_anot)
 keep_genes <- !is.na(gene_mice$Symbol)
 counts_S_CON_GF <- counts_S_CON_GF[keep_genes,]
 gene_mice <- gene_mice[keep_genes,]
-```
 
-``` {r keep-check, include = FALSE}
+#Check
 sum(is.na(gene_mice$Symbol))
 nrow(counts_S_CON_GF)
 nrow(gene_mice)
@@ -171,9 +165,6 @@ ER_Counts <- DGEList(counts_S_CON_GF, group = group_data, genes = gene_mice)
 class(ER_Counts)
 # Shows group & library sizes
 head(ER_Counts$samples, 4)
-```
-
-``` {r ER-check, include = FALSE}
 # Explore what other information the data object includes
 head(ER_Counts$counts, 4)
 head(ER_Counts$genes, 4)
@@ -183,9 +174,7 @@ head(ER_Counts$genes, 4)
 # In EdgeR, a design matrix is also used for some functions and can be created here. The design is specified simply in this case as ~0+group_data, so that samples are simply marked as part of a group or not.
 ER_des.m <- model.matrix(~0+group_data)
 colnames(ER_des.m) <- levels(group_data)
-```
-
-``` {r des-check, include = FALSE}
+# Check
 ER_des.m
 ```
 
@@ -196,9 +185,8 @@ DS_Counts <- DESeqDataSetFromMatrix(countData = counts_S_CON_GF, colData = colda
 DS_Counts
 #Shows library sizes
 colSums(counts(DS_Counts))
-```
 
-``` {r DS-check, include = FALSE}
+#Check
 head(assay(DS_Counts), 4)
 head(rowData(DS_Counts), 4)
 ```
@@ -236,24 +224,39 @@ DS_Counts_N$sizeFactor
 
 ```
 
-### Data Visualization
+Data Visualization
+``` {r visual-cpm}
+# SAy something about this
+#Fix labels and other graph details
+DS_AveLogCPM <- aveLogCPM(DS_Counts)
+hist(DS_AveLogCPM)
+ER_AveLogCPM <- aveLogCPM(ER_Counts)
+hist(ER_AveLogCPM)
+```
+
+``` {r visual-mds}
+# Say something brief about MDS
+# Set formatting options
+pch_groups <- c(16,17)
+colors_groups <-c("orchid2", "blue")
+
+# MDS visualization for EdgeR
+ER_MDS.out <- plotMDS(ER_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
+legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+
+# MDS visualization for DESeq2
+DS_MDS.out <- plotMDS(DS_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
+legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+```
 
 ## 4. Main Software Tools Description
 
 From De Paepe: TMM (EdgeR) gives a correction factor for the library size, but the median ratio method (DESeq2) generates a correction factor to apply to the raw counts.
+Some more stuff to type
 
 
 ## 5. Code Section 2 – Main Analysis
 
-From the assignment details:
-
-25%
-
-"What would go in this section would depend upon your project, e.g.: writing code to build and test a classifier, build visualizations to explore ideas, conduct a statistical test of a biological hypothesis, or explore the impact of methodological choices upon results"
-
-"Your main analysis section must also include a minimum of 2 figures and a maximum of 3 figures."
-
-"Please see the guidelines for code section #1 above. The same general messages apply, including to focus upon quality, not length, and to comment your code well, etc."
 
 
 ##6. Quality of Visualizations
