@@ -6,22 +6,25 @@ output: pdf_document
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, results = "hold")
 knitr::opts_chunk$set(tidy = TRUE, tidy.opts=list(width.cutoff=88))
 ```
 
 ## 1. Introduction
 
-  For this assignment, I am choosing option 7, which explores differential gene expression. I will be comparing two of the popular options which had tutorials listed in the helpul links section of the assignment details: EdgeR (tutorial by Chen et al.) and DESeq2 (tutorial by Love et al.) There are many other software packages and pipelines, such as voom-limma, baySeq, and Cufflinks, as have been extensively compared each showing their own strengths and best circumstances for use (Li et al. 2020). Even more packages are being developed to specialize the statistics and algorithms to single-cell RNA-seq data’s unique considerations like increased zero read counts, but at this stage of development, analytic tools developed for bulk RNA-seq data such as DESeq2 and EdgeR perform comparably well (Wang et al. 2019). The abundance of available choices can be quite overwhelming to a new user.
-
-	The main steps in differential gene expression analysis, in their simplest terms, are processing sequencing data into a count matrix, normalization of library sizes, and analysis of normalized counts. Each step in the process relies on certain statistical assumptions for the best way to process the data. I will begin analysis with the count matrix already constructed from an experiment uploaded to Gene Expression Omnibus (GEO), and focus my comparison on the different methods for library normalization, “Trimmed Mean of M-values” (TMM) used in EdgeR and “Relative Log Expression” (RLE) used in DESeq2. Both edgeR and DESeq2 use an negative binomial distribution for the modeling of gene expression, but they diverge again at their test for differential expression, with EdgeR using the Exact test, and DESeq2 using a Wald test (De Paepe, 2014-2015; Tang et al. 2015). I will mostly focus on normalization methods for my exploration and comparison.
-
-	To contribute to the ongoing community discussion of the relative merits of different gene expression packages, I will use the default statistical settings within each package when options exist, but otherwise keep filtering and processing of the data within each package whenever possible. The end goal is to produce an assessment of which package’s statistical method, with specific reference to library normalization, is most liberal or conservative in it’s estimation of differentially expressed genes, and which package produces the most similar results to the original author’s published analysis.
+  For this assignment, I am choosing option 7, which explores differential gene expression. There are many software packages and pipelines, such as voom-limma, baySeq, and Cufflinks, as have been extensively compared each showing their own strengths and best circumstances for use (Li et al. 2020). Even more packages are being developed to specialize the statistics and algorithms to single-cell RNA-seq data’s unique considerations like increased zero read counts, but at this stage of development, analytic tools developed for bulk RNA-seq data such as DESeq2 and EdgeR perform comparably well (Wang et al. 2019). The abundance of available choices can be quite overwhelming to a new user. Based on a summary of fourteen studies comparing normalization methods, the five most recent included both edgeR and DESeq2 in the analysis, and the two packages consistently performed best under specific circumstances, or comparably to others (Li et al. 2020). As they seem consistently popular and well performing, I will be comparing EdgeR and DESeq, both of which had tutorials listed in the helpul links section of the assignment details (Chen et al.; Love et al.).  
+    
+  The main steps in differential gene expression analysis, in their simplest terms, are processing sequencing data into a count matrix, normalization of library sizes, and analysis of normalized counts. Each step in the process relies on certain statistical assumptions for the best way to process the data. I will begin analysis with the count matrix already constructed from an experiment uploaded to Gene Expression Omnibus (GEO). For normalization methods, EdgeR uses “Trimmed Mean of M-values” (TMM), and DESeq2 uses “Relative Log Expression” (RLE) (Maza). Both edgeR and DESeq2 use an negative binomial distribution for the modeling of gene expression, but they diverge again at their test for differential expression, with EdgeR using the Exact test, and DESeq2 using a Wald test (De Paepe, 2014-2015; Tang et al. 2015). 
+    
+  To contribute to the ongoing community discussion of the relative merits of different gene expression packages, I will use the default statistical settings within each package when options exist, but otherwise keep filtering and processing of the data within each package whenever possible. The end goal is to produce an assessment of which package’s statistical method, with specific reference to which results are most liberal or conservative in it’s estimation of differentially expressed genes, and which package produces the most similar results to the original author’s published analysis.
 
 
 ## 2. Description of Data Set
 
--From Stilling et al. the original study had three groups of mice, conventional (CON), germ-free (GF), and ex-GF (born GF, colonized at weaning). They used different mice for the control group (naive) and the group subjected to a social interaction task. This makes 6 groups for the original study, I will subset and look at CON-SI/GF-SI, if time might add CON/GF naive (P). Including biological replicates, they had 40 samples, I will use 4 biological replicates of each, for a total of 8 samples. Count data was downloaded from GEO on 11/24, results matrix was downloaded on 11/27.
+The data set for this assignment was downloaded from an original research project by Stilling et al. exploring which genes are differentially by social interaction tasks in conventionally (CON) raised mice, germ-free (GF) mice, and ex-GF mice that were colonized after weaning (2018). The research was interested in how the microbiome can impact gene expression and the associated metabolic pathways. There are six groups in the original study, naive (P) and social interaction (SI) mice for each of CON, GF, and ex-GF, totaling 40 samples. Experimental data is available through NCBI's Gene Expression Omnibus (GEO) using accession number GSE114702, at the following location:  
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE114702  
+  
+Count data was downloaded from GEO on 11/24/2020, and the results matrix was downloaded on 11/27/2020. For my study I will subset the data to a manageable size, and only use 4 biological replicates each of CON-SI and GF-SI mice.
 
 
 ## 3. Code Section 1 – Data Acquisition, Exploration, Filtering, and Quality Control
@@ -32,8 +35,6 @@ Preliminary Set-up & Data Acquisition
 # All libraries were loaded at the beginning of the script for efficient organization.
 #install.packages("stringr")
 library(stringr)
-#BiocManager::install("org.Mm.eg.db")
-library(org.Mm.eg.db)
 #BiocManager::install("edgeR")
 library(edgeR)
 #BiocManager::install("DESeq2")
@@ -55,22 +56,44 @@ library(vidger)
 dir <- "/Users/lisa/Documents/Bioinformatics/6210/A5/scripts_data/a5_data/"
 ```
 
-```{r load-data}
-# Download file with these two commands
+```{r load-count-data}
+# Download count file with these two commands
 # Count_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file",
 #"file=GSE114702_HTSeq_gene_counts.txt.gz", sep="&")
-# download.file(Count_URL, paste0(dir, "GSE114702_HTSeq_gene_counts.txt.gz"))
+#Let user specify save name for file:
+count_file <- "GSE114702_HTSeq_gene_counts.txt.gz"
+# download.file(Count_URL, paste0(dir, count_file))
 
 # Read in file; first column is the gene identifiers, which will be used for row names
-countdata_mice <- read.delim(paste0(dir, "GSE114702_HTSeq_gene_counts.txt.gz"), row.names = 1)
+countdata_mice <- read.delim(paste0(dir, count_file), row.names = 1)
+rm(count_file)
 
 # Check data loaded as expected:
 class(countdata_mice)
-colnames(countdata_mice)
-head(rownames(countdata_mice))
+dim(countdata_mice)
 countdata_mice[1:5, c(1,6,18,30)]
 ```
 
+``` {r load-results-data}
+# Download results spreadsheet
+#Results_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file", "file=GSE114702_Processed_data_file_2_-_DESeq2_results.xlsx", sep="&")
+#Let user specify save name for file:
+res_file <- "GSE114702_DESeq2_results.xlsx"
+#download.file(Results_URL, paste0(dir, res_file)
+
+# If unsure which sheet, can check list:
+#sheets <- excel_sheets(paste0(dir, res_file))
+#sheets
+res_OG <- read_excel(paste0(dir, res_file), sheet = "CONsi-GFsi", na = "NA")
+# There are a few warnings reading in the spreadsheet that show Excel formatted a number into a date. Comparing the cells with warnings in spreadsheet to the dataframe in R, the cells belong to the "% GC content" variable, and seem to have an expected value R's dataframe. Since this analysis does not use % GC content, I will ignore it, but if it was part of the analysis, I might consider replacing those cells with NAs to be safe.
+
+res_OG <- as.data.frame(res_OG)
+rownames(res_OG) <- res_OG$`Ensembl Gene ID`
+
+# Check results
+class(res_OG)
+res_OG[1:6,c(1,9,12,13)]
+```
 ```{r replicate-sample}
 # In order to efficiently sample the biological replicates of the groups I wish to work with, I will first define a function to sample a single group at a time, and a companion function to sample all groups at once.
 replicate_sample <- function(samples, group, size = 4) {
@@ -84,7 +107,7 @@ replicate_sample <- function(samples, group, size = 4) {
 # With the function for sampling the biological replicates defined, I will extract 4 biological replicates for the social interaction group mice of the CON and GF types (CON.S & GF.S)
 sample_names <- colnames(countdata_mice)
 # Setting seed for reproducibility
-set.seed(40404)
+set.seed(6210)
 # Applying function for 2 groups of interest
 col_S_CON_GF <- lapply(c("CON.S", "GF.S"), FUN = function(x) replicate_sample(sample_names, x))
 col_S_CON_GF <- unlist(col_S_CON_GF)
@@ -110,14 +133,14 @@ class(coldata_mice)
 ```
 
 ``` {r edgeR-object}
-# The count matrix and corresponding data is put together
+# The count matrix and corresponding data is put together for EdgeR package
 ER_Counts <- DGEList(counts_S_CON_GF, group = group_data)
 
 # A few simple checks
 class(ER_Counts)
 # Shows group & library sizes
 head(ER_Counts$samples, 4)
-# Explore what other information the data object includes
+# Check the count matrix
 head(ER_Counts$counts, 4)
 ```
 
@@ -130,20 +153,19 @@ t(ER_des.m)
 ```
 
 ```{r DESeq2-object}
-# The count matrix and corresponding data is put together. The DESeq2 object also allows gene information to be added like in EdgeR, but under the argument, rowData
+# The count matrix and corresponding data is put together for the DESeq2 object. The same design as used for EdgeR is specified.
 DS_Counts <- DESeqDataSetFromMatrix(countData = counts_S_CON_GF, colData = coldata_mice, design = ~ 0 + Group)
 
 # A few simple checks
-DS_Counts
-#Shows library sizes
+class(DS_Counts)
+# Shows library sizes
 colSums(counts(DS_Counts))
-
-#Check
+# Check the count matrix
 head(assay(DS_Counts), 4)
 ```
 
 Filtering and Quality Control
-``` {r filters}
+``` {r default-filters, results = "markup"}
 # The EdgeR has a function designed for filtering according to user-set parameters, which returns a logical vector that can be passed to subset the count data object.
 # The default parameters for are min.count=10 (minimum numeric count for at least some samples), min.total.count = 15, and min.prop=0.7, with values being calculated as counts per million (CPM)
 ER_filt_data_def <- filterByExpr(ER_Counts, ER_des.m)
@@ -152,28 +174,67 @@ table(ER_filt_data_def)
 # The DESeq2 tutorial filters out genes that have 1 or fewer reads total. The authors describe this only as a pre-filtering step to eliminate empty and nearly empty row, with further filtering occurring downstream.
 DS_filt_data_def <- rowSums(counts(DS_Counts)) > 1
 table(DS_filt_data_def)
-
-# Since the Stilling et al. paper that is the source of the data set did not specify their filtering parameters, but did mention using DESeq2 with default parameters for their analysis, I will filter both sets using the total count greater than 1.
+```
+``` {r filter-og}
+# The original paper indicated that they used DESeq2 with default options for their analysis, but did not specify if that included the pre-filtering. We can use the number of genes that have "NA" in the p-value column as a guess for which genes were removed prior to analysis
+data.frame("NA" = sum(is.na(res_OG$pvalue)), "DATA" = sum(!is.na(res_OG$pvalue)))
+```
+``` {r apply-filter}
+# Since the number of remaining genes in the original paper, `r<sum(!is.na(res_OG$pvalue))>`, is similar to the amount using the recommended filter of the DESeq2 package, `r<sum(rowSums(counts(DS_Counts)) > 1)>`, and quite different from the EdgeR filtering at this stage (`r<sum(filterByExpr(ER_Counts, ER_des.m))>` remaining), I will use the filtering recommeded in the DESeq2 tutorial.
 # EdgeR has an internal library sizes variable, so we use the argument keep.lib.sizes = FALSE to reevaluate the library sizes after eliminating some genes.
 # DESeq2 uses the sum of count data, and does not need the argument.
 ER_Counts <- ER_Counts[DS_filt_data_def, , keep.lib.sizes=FALSE]
 DS_Counts <- DS_Counts[DS_filt_data_def, ]
 ```
 
+``` {r visual-pca}
+# The quality of data can be checked by comparing the relative distances of samples with a Principal Component Analysis (PCA) plot, which visually shows the higher-order distances between samples using transformed data
+# Since only the DESeq2 package provides a function for plotting the PCA, and the counts are identical at this point, I will proceed with the count matrix in the DDS object
+vst_Counts <- vst(DS_Counts, blind = FALSE)
+# Assign PCA data to an object to plot with ggplot
+pcaData <- plotPCA(vst_Counts, intgroup = "Group")
+# Calculate variances of top 2 components for labeling axes
+ggplot(pcaData$data, aes(x = PC1, y = PC2, col = Group)) +
+  geom_point(size = 3) +
+  xlab(pcaData$labels$x) +
+  ylab(pcaData$labels$y) +
+  coord_fixed() +
+  ggtitle("PCA with VST data")
+
+# This plot shows that while the GF mice are reasonably well clustered together, there is very little association between the CON samples, and this data may not work well with differential gene expression analysis.
+```
+
+``` {r visual-mds}
+# Say something brief about MDS
+# Set formatting options
+pch_groups <- c(16,17)
+colors_groups <-c("orchid2", "blue")
+
+# MDS visualization for EdgeR
+ER_MDS.out <- plotMDS(ER_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
+legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+
+# MDS visualization for DESeq2
+#include size factor in object:
+DS_Counts_N <- estimateSizeFactors(DS_Counts)
+DS_MDS.out <- plotMDS(DS_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
+legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+```
+
 Library Normalization
-```{r normalization}
+```{r normalization, results = "markup"}
 # Library size normalization is where the two packages diverge significantly, each using a different statistical method
-# In EdgeR, the default normalization is done by TMM
+# In EdgeR, the default normalization is done by TMM, and the factors are added into the samples feature of the DGEList object
 ER_Counts_N <- calcNormFactors(ER_Counts)
 ER_Counts_N$samples
 
-# In DESeq2, the default normalization is done as part of the internal process of the DESeq command that determines which genes are differentially expressed. We can use the command below to estimate the factors in a similar manner to EdgeR.
+# In DESeq2, the default normalization is done as part of the internal process of the DESeq command that determines which genes are differentially expressed. We can still calculate the size factors separately using the "estimateSizeFactorsForMatrix" command, or add to the DESeqDataSet object using the estimateSizeFactors" command.
 
 # DESeq2 uses RLE to estimate size factors
 DS_Counts_Nf <- estimateSizeFactorsForMatrix(counts(DS_Counts))
 DS_Counts_Nf
 
-# EdgeR has a methods option to specify RLE, but the process is different, so the results will not be the same, but I will calculate here for comparison
+# EdgeR has an option to specify RLE as the statistical method, but the process is different, so the results will not be the same. I will calculate here for comparison
 ER_Counts_RLE <- calcNormFactors(ER_Counts, method = "RLE")
 ER_Counts_RLE$samples
 ```
@@ -190,31 +251,18 @@ df_temp$group <- "RLE(edgeR)"
 df_norm_factors <- rbind(df_norm_factors, df_temp)
 df_temp <- data.frame(group = rep("RLE(DESeq2)", 8), lib.size = colSums(counts(DS_Counts)), norm.factors = DS_Counts_Nf)
 df_norm_factors <- rbind(df_norm_factors, df_temp)
+rm(df_temp)
 
-ggplot(df_norm_factors, aes(x = lib.size/(10^5), y = norm.factors, color = group, shape = group)) +
+ggplot(df_norm_factors, aes(x = lib.size/(10^6), y = norm.factors, col = group)) +
   geom_point() +
-  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
-```
-
-``` {r visual-mds}
-# Say something brief about MDS
-# Set formatting options
-pch_groups <- c(16,17)
-colors_groups <-c("orchid2", "blue")
-
-# MDS visualization for EdgeR
-ER_MDS.out <- plotMDS(ER_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
-legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
-
-# MDS visualization for DESeq2
-DS_MDS.out <- plotMDS(DS_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
-legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+  labs(x = "Library Size (in millions)", y = "Normalization Factor", title = "Comparison of impact of library size on normalization factors") +
+  guides(col = guide_legend("Norm. Method"), group = FALSE) +
+  geom_smooth(method = lm, se = FALSE, fullrange = TRUE, linetype = "dashed")
 ```
 
 ## 4. Main Software Tools Description
 
-From De Paepe: TMM (EdgeR) gives a correction factor for the library size, but the median ratio method (DESeq2) generates a correction factor to apply to the raw counts.
-Based on a summary of fourteen studies comparing normalization methods, the five most recent included both edgeR and DESeq2 in the analysis, and the two packages consistently performed best under specific circumstances, or comparably to others (Li et al. 2020). A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), but an interesting differences are that TMM pre-normalizes raw counts by library size while RLE does not.
+TMM (EdgeR) gives a correction factor for the library size, but the median ratio method (DESeq2) generates a correction factor to apply to the raw counts (De Paepe). A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), but an interesting differences are that TMM pre-normalizes raw counts by library size while RLE does not.
 
 ## 5. Code Section 2 – Main Analysis
 
@@ -261,26 +309,7 @@ top_p_DS
 
 ``` {r de-orig}
 # Compare to results from original paper
-# Download results spreadsheet
-#Results_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file", "file=GSE114702_Processed_data_file_2_-_DESeq2_results.xlsx", sep="&")
-#download.file(Results_URL, paste0(dir, "GSE114702_DESeq2_results.xlsx"))
 
-# Locate correct sheet for comparison
-sheets <- excel_sheets(paste0(dir, "GSE114702_DESeq2_results.xlsx"))
-sheets
-res_OG <- read_excel(paste0(dir, "GSE114702_DESeq2_results.xlsx"), sheet = sheets[5], na = "NA")
-# There are a few warnings reading in the spreadsheet that show Excel formatted a number into a date. Comparing the cells with warnings in spreadsheet to the dataframe in R, the cells belong to the "% GC content" variable, and seem to have an expected value R's dataframe. Since this analysis does not use % GC content, I will ignore it, but if it was part of the analysis, I might consider replacing those cells iwth NAs to be safe.
-
-# Check and format results
-class(res_OG)
-res_OG <- as.data.frame(res_OG)
-head(res_OG)
-colnames(res_OG)
-rownames(res_OG) <- res_OG$`Ensembl Gene ID`
-
-sum(is.na(res_OG$padj))
-sum(is.na(res_OG$`Associated Gene Name`))
-sum(is.na(res_OG$log2FoldChange))
 
 #
 top_p_OG <- row.names(head(res_OG[order(res_OG$pvalue), ], 10))
@@ -351,19 +380,27 @@ Add any necessary acknowledgements here
 
 ### Academic References
 
-De Paepe
-Li et al
-Maza
-Stilling et al
-Tang et al
-Varet et al
-Wang et al
+   De Paepe, K. (2014-2015). Comparison of methods for differential gene expression using RNA-seq data. Universiteit Gent: Master dissertation  
+
+   Li, X,  Cooper, NGF, O’Toole, TE, Rouchka, EC. (2020). Choice of library size normalization and statistical methods for differential gene expression analysis in balanced two-group comparisons for RNA-seq studies. *BMC Genomics*, 21:75. https://doi.org/10.1186/s12864-020-6502-7  
+
+   Maza, E. (2016). In Papyro Comparison of TMM (edgeR), RLE (DESeq2), and MRN Normalization Methods for a Simple Two-Conditions-Without-Replicates RNA-Seq Experimental Design. *Frontiers in Genetics*, 7(n° 164). https://doi.org/10.3389/fgene.2016.00164  
+ 
+   McDermaid, A, Monier, B, Zhao, J, Liu, B, Ma, Q. (2019). Interpretation of differential gene expression results of RNA-seq data: review and integration. *Briefings in Bioinformatics*, 20(6), 2044–2054. https://doi.org/10.1093/bib/bby067  
+
+  Stilling, RM, Moloney, GM, Ryan, FJ, Hoban, AE, Bastiaanssem, TFS, Shanahan, F. (2018). Social interaction-induced activation of RNA splicing in the amygdala of microbiome-deficient mice. *eLife*, 7. https://doi.org/10.7554/elife.33070  
+  
+   Tang, M, Sun, J, Shimizu, K, Kadota, K. (2015). Evaluation of methods for differential expression analysis on multi-group RNA-seq count data. *BMC Bioinformatics*, 16:361. https://doi.org/10.1186/s12859-015-0794-7  
+
+   Wang, T, Li, B, Nelson, CE, Nabavi, S. (2019). Comparative analysis of differential gene expression analysis tools for single-cell RNA sequencing data. *BMC Bioinformatics*, 20:40. https://doi.org/10.1186/s12859-019-2599-6
 
 
 ### Coding References
 
-Chen et al
-Love et al
+   Chen, Y, Lun, ATL, Smyth, GK. (2016). From reads to genes to pathways: differential expression analysis of RNA-Seq experiments using Rsubread and the edgeR quasi-likelihood pipeline. *F1000 Research, 5*, 1438–1438. https://doi.org/10.12688/f1000research.8987.2  
+
+   Love, MI, Anders, S, Kim, V, Huber, W. (2015). RNA-Seq workflow: gene-level exploratory analysis and differential expression. *F1000 Research, 4*, 1070. https://doi.org/10.12688/f1000research.7035.1  
+
 
 Knitr options:
 https://yihui.org/knitr/options/
