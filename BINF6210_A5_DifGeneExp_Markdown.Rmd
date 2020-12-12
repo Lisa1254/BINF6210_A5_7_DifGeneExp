@@ -5,79 +5,334 @@ date: "BINF6210 A5: due Dec. 11, 2020"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(tidy = TRUE, tidy.opts=list(width.cutoff=88))
 ```
 
-# 1. Introduction
+## 1. Introduction
 
-Initializing document as a template to be filled in as the project is completed.
+  For this assignment, I am choosing option 7, which explores differential gene expression. I will be comparing two of the popular options which had tutorials listed in the helpul links section of the assignment details: EdgeR (tutorial by Chen et al.) and DESeq2 (tutorial by Love et al.) There are many other software packages and pipelines, such as voom-limma, baySeq, and Cufflinks, as have been extensively compared each showing their own strengths and best circumstances for use (Li et al. 2020). Even more packages are being developed to specialize the statistics and algorithms to single-cell RNA-seq data’s unique considerations like increased zero read counts, but at this stage of development, analytic tools developed for bulk RNA-seq data such as DESeq2 and EdgeR perform comparably well (Wang et al. 2019). The abundance of available choices can be quite overwhelming to a new user.
 
-From the assignment details: 
-"short written section of 2-3 paragraphs: 10%"
-"Which of these types of projects are you conducting? And, what is the objective of your project? Aim to cite 2-4 suitable references in your introduction. You may use any of the references uploaded to CourseLink or other literature you find on your topic."
-"Please note that I would consider a “paragraph” to be approximately between one- quarter page and one-half page of text, using single spacing and 12-point font."
-"Paragraph 1: What is the overarching topic you are interested in? Why is this scientifically important and interesting and/or societally relevant?"
-"Paragraph 2: You can outline what is an important sub-area of research or a gap in knowledge. (As an example, perhaps your broader theme is gene expression analysis, and in paragraph 2 you could narrow in to introduce the importance of statistical choices.)"
-"Paragraph 3: What is the specific objective of your study? What kind of study are you performing? What will you do?"
+	The main steps in differential gene expression analysis, in their simplest terms, are processing sequencing data into a count matrix, normalization of library sizes, and analysis of normalized counts. Each step in the process relies on certain statistical assumptions for the best way to process the data. I will begin analysis with the count matrix already constructed from an experiment uploaded to Gene Expression Omnibus (GEO), and focus my comparison on the different methods for library normalization, “Trimmed Mean of M-values” (TMM) used in EdgeR and “Relative Log Expression” (RLE) used in DESeq2. Both edgeR and DESeq2 use an negative binomial distribution for the modeling of gene expression, but they diverge again at their test for differential expression, with EdgeR using the Exact test, and DESeq2 using a Wald test (De Paepe, 2014-2015; Tang et al. 2015). I will mostly focus on normalization methods for my exploration and comparison.
+
+	To contribute to the ongoing community discussion of the relative merits of different gene expression packages, I will use the default statistical settings within each package when options exist, but otherwise keep filtering and processing of the data within each package whenever possible. The end goal is to produce an assessment of which package’s statistical method, with specific reference to library normalization, is most liberal or conservative in it’s estimation of differentially expressed genes, and which package produces the most similar results to the original author’s published analysis.
 
 
-# 2. Description of Data Set
+## 2. Description of Data Set
 
-From the assignment details:
-10%
-"Provide a short written description of your data set. What data set have you chosen to analyze to address your question? Describe the data set. Where are the data from, e.g. from the literature? from a public data base? On what date did you obtain the data? How did you obtain the data? What are the properties of the data set? How many samples are there, and what are the key variables you are interested in? If you are comparing groups (e.g. treatments, organisms, cell types, genes), describe the nature of the groups that you are comparing. Cite the source of the data set."
-"Depending upon the size of the data set, you may consider analyzing only a subset here, to keep the project scope in check."
+-From Stilling et al. the original study had three groups of mice, conventional (CON), germ-free (GF), and ex-GF (born GF, colonized at weaning). They used different mice for the control group (naive) and the group subjected to a social interaction task. This makes 6 groups for the original study, I will subset and look at CON-SI/GF-SI, if time might add CON/GF naive (P). Including biological replicates, they had 40 samples, I will use 4 biological replicates of each, for a total of 8 samples. Count data was downloaded from GEO on 11/24, results matrix was downloaded on 11/27.
 
 
-# 3. Code Section 1 – Data Acquisition, Exploration, Filtering, and Quality Control
+## 3. Code Section 1 – Data Acquisition, Exploration, Filtering, and Quality Control
 
-From the assignment details:
-25%
-"Whenever possible, include code for data acquisition for your project. Also, include all data files needed for analysis with your submission."
-"After data acquisition, you will next conduct data exploration, filtering, and quality control."
-"For RNA-Seq data, you should examine library size among samples and make a suitable analytical choice that takes into account variability in library size. A suitable plot for that type of analysis could be to plot gene expression levels before vs. after normalization (e.g. see example script we used in class for one option). You should also explicitly consider how you will choose to treat lowly-expressed genes for your project."
-"In general, for your project, think (and read) about: What can go wrong with the type of data you are analyzing? And, what types of variability might be expected in that type of data?"
-"Also, make a deliberate decision about how you will treat missing data for your project. Will you focus on genes or traits with a good sample size, for example? Do you need complete cases (e.g. can you only include species having sequence data for each of two genes)? If suitable for your project, you may consider incorporating imputation techniques."
-"Your data exploration and quality control section should include at least 2 figures and a maximum of 3 figures"
-"Please comment your code well. You do not need to explain syntax. Rather, you should explain what you are doing and why at each step. Why did you make a particular choice? Provide a brief justification for choices you have made for arguments to the functions you are using (whether you use the default or not)"
-"I would expect that, in most cases, 2-3 pages worth of high-quality, commented code will suffice for each of the code sections. As well, please note that high-quality code is often more concise than early-draft code. For example, can you reduce redundancy by using an apply function, foreach(), a for loop or while loop (if suitable), or writing your own function?"
-"Remember to put “sanity checks” into your code. Are your data filtering steps and preliminary analysis steps doing what you want?"
+Preliminary Set-up & Data Acquisition
 
+``` {r libraries}
+# All libraries were loaded at the beginning of the script for efficient organization.
+#install.packages("stringr")
+library(stringr)
+#BiocManager::install("org.Mm.eg.db")
+library(org.Mm.eg.db)
+#BiocManager::install("edgeR")
+library(edgeR)
+#BiocManager::install("DESeq2")
+library(DESeq2)
+#install.packages("ggplot2")
+library(ggplot2)
+#install.packages("gridExtra")
+library(gridExtra)
+#install.packages("readxl")
+library(readxl)
+#BiocManager::install("vidger")
+library(vidger)
+```
 
-# 4. Main Software Tools Description
+```{r set-dir}
+# A variable, "dir" is used to define the working directory
+# Keeping this here for now, before submitting delete this comment and change to empty string: ""
+# User can specify directory here for downloading and saving files, or leave empty
+dir <- "/Users/lisa/Documents/Bioinformatics/6210/A5/scripts_data/a5_data/"
+```
 
-From the assignment details:
-1 paragraph: 5%
-"Why did you make this choice? What are the expected strengths and weaknesses of the tool you chose? Did you consider any alternatives? Cite the authors of the tool you used (you can cite the package itself plus the relevant associated publication, if available). If you are conducting a methodological project involving a comparison of tools, you might briefly describe two main tools in this section. Otherwise, you will typically describe one main software tool."
-"Also, in this section, make it clear how you built upon existing vignettes for conducting your project."
+```{r load-data}
+# Download file with these two commands
+# Count_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file",
+#"file=GSE114702_HTSeq_gene_counts.txt.gz", sep="&")
+# download.file(Count_URL, paste0(dir, "GSE114702_HTSeq_gene_counts.txt.gz"))
 
+# Read in file; first column is the gene identifiers, which will be used for row names
+countdata_mice <- read.delim(paste0(dir, "GSE114702_HTSeq_gene_counts.txt.gz"), row.names = 1)
 
-# 5. Code Section 2 – Main Analysis
+# Check data loaded as expected:
+class(countdata_mice)
+colnames(countdata_mice)
+head(rownames(countdata_mice))
+countdata_mice[1:5, c(1,6,18,30)]
+```
 
-From the assignment details:
-25%
-"What would go in this section would depend upon your project, e.g.: writing code to build and test a classifier, build visualizations to explore ideas, conduct a statistical test of a biological hypothesis, or explore the impact of methodological choices upon results"
-"Your main analysis section must also include a minimum of 2 figures and a maximum of 3 figures."
-"Please see the guidelines for code section #1 above. The same general messages apply, including to focus upon quality, not length, and to comment your code well, etc."
+```{r replicate-sample}
+# In order to efficiently sample the biological replicates of the groups I wish to work with, I will first define a function to sample a single group at a time, and a companion function to sample all groups at once.
+replicate_sample <- function(samples, group, size = 4) {
+  gp_index <- grep(paste0("^", group), samples)
+  sample_index <- sample(gp_index, size)
+  return(sample_index)
+}
+```
 
+```{r subset-data}
+# With the function for sampling the biological replicates defined, I will extract 4 biological replicates for the social interaction group mice of the CON and GF types (CON.S & GF.S)
+sample_names <- colnames(countdata_mice)
+# Setting seed for reproducibility
+set.seed(40404)
+# Applying function for 2 groups of interest
+col_S_CON_GF <- lapply(c("CON.S", "GF.S"), FUN = function(x) replicate_sample(sample_names, x))
+col_S_CON_GF <- unlist(col_S_CON_GF)
+# Subsetting data
+counts_S_CON_GF <- countdata_mice[,col_S_CON_GF]
 
-# 6. Quality of Visualizations
+# Check
+colnames(counts_S_CON_GF)
+# Remove variable no longer needed
+rm(col_S_CON_GF)
+```
+
+Create & Explore Data Objects for EdgeR and DESeq2 Packages
+```{r column-annot}
+# DESeq2 requires a dataframe of column information for creating the DESeq Data Set
+group_data <- str_remove(colnames(counts_S_CON_GF), pattern = ".S[0-9]+")
+group_data <- factor(group_data)
+coldata_mice <- data.frame(Group = group_data)
+
+# Check
+table(group_data)
+class(coldata_mice)
+```
+
+``` {r edgeR-object}
+# The count matrix and corresponding data is put together
+ER_Counts <- DGEList(counts_S_CON_GF, group = group_data)
+
+# A few simple checks
+class(ER_Counts)
+# Shows group & library sizes
+head(ER_Counts$samples, 4)
+# Explore what other information the data object includes
+head(ER_Counts$counts, 4)
+```
+
+``` {r ER-des-m}
+# In EdgeR, a design matrix is also used for some functions and can be created here. The design is specified simply in this case as ~0+group_data, so that samples are simply marked as part of a group or not.
+ER_des.m <- model.matrix(~0+group_data)
+colnames(ER_des.m) <- levels(group_data)
+# Check; transpose to take less space
+t(ER_des.m)
+```
+
+```{r DESeq2-object}
+# The count matrix and corresponding data is put together. The DESeq2 object also allows gene information to be added like in EdgeR, but under the argument, rowData
+DS_Counts <- DESeqDataSetFromMatrix(countData = counts_S_CON_GF, colData = coldata_mice, design = ~ 0 + Group)
+
+# A few simple checks
+DS_Counts
+#Shows library sizes
+colSums(counts(DS_Counts))
+
+#Check
+head(assay(DS_Counts), 4)
+```
+
+Filtering and Quality Control
+``` {r filters}
+# The EdgeR has a function designed for filtering according to user-set parameters, which returns a logical vector that can be passed to subset the count data object.
+# The default parameters for are min.count=10 (minimum numeric count for at least some samples), min.total.count = 15, and min.prop=0.7, with values being calculated as counts per million (CPM)
+ER_filt_data_def <- filterByExpr(ER_Counts, ER_des.m)
+table(ER_filt_data_def)
+
+# The DESeq2 tutorial filters out genes that have 1 or fewer reads total. The authors describe this only as a pre-filtering step to eliminate empty and nearly empty row, with further filtering occurring downstream.
+DS_filt_data_def <- rowSums(counts(DS_Counts)) > 1
+table(DS_filt_data_def)
+
+# Since the Stilling et al. paper that is the source of the data set did not specify their filtering parameters, but did mention using DESeq2 with default parameters for their analysis, I will filter both sets using the total count greater than 1.
+# EdgeR has an internal library sizes variable, so we use the argument keep.lib.sizes = FALSE to reevaluate the library sizes after eliminating some genes.
+# DESeq2 uses the sum of count data, and does not need the argument.
+ER_Counts <- ER_Counts[DS_filt_data_def, , keep.lib.sizes=FALSE]
+DS_Counts <- DS_Counts[DS_filt_data_def, ]
+```
+
+Library Normalization
+```{r normalization}
+# Library size normalization is where the two packages diverge significantly, each using a different statistical method
+# In EdgeR, the default normalization is done by TMM
+ER_Counts_N <- calcNormFactors(ER_Counts)
+ER_Counts_N$samples
+
+# In DESeq2, the default normalization is done as part of the internal process of the DESeq command that determines which genes are differentially expressed. We can use the command below to estimate the factors in a similar manner to EdgeR.
+
+# DESeq2 uses RLE to estimate size factors
+DS_Counts_Nf <- estimateSizeFactorsForMatrix(counts(DS_Counts))
+DS_Counts_Nf
+
+# EdgeR has a methods option to specify RLE, but the process is different, so the results will not be the same, but I will calculate here for comparison
+ER_Counts_RLE <- calcNormFactors(ER_Counts, method = "RLE")
+ER_Counts_RLE$samples
+```
+
+Data Visualization
+``` {r visual-norm-factors}
+# To compare different normalization methods make dataframe of library size and normalization factors to pass to ggplot
+# Still need to update labels and stuff
+
+df_norm_factors <- ER_Counts_N$samples
+df_norm_factors$group <- "TMM(edgeR)"
+df_temp <- ER_Counts_RLE$samples
+df_temp$group <- "RLE(edgeR)"
+df_norm_factors <- rbind(df_norm_factors, df_temp)
+df_temp <- data.frame(group = rep("RLE(DESeq2)", 8), lib.size = colSums(counts(DS_Counts)), norm.factors = DS_Counts_Nf)
+df_norm_factors <- rbind(df_norm_factors, df_temp)
+
+ggplot(df_norm_factors, aes(x = lib.size/(10^5), y = norm.factors, color = group, shape = group)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+```
+
+``` {r visual-mds}
+# Say something brief about MDS
+# Set formatting options
+pch_groups <- c(16,17)
+colors_groups <-c("orchid2", "blue")
+
+# MDS visualization for EdgeR
+ER_MDS.out <- plotMDS(ER_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
+legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+
+# MDS visualization for DESeq2
+DS_MDS.out <- plotMDS(DS_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
+legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+```
+
+## 4. Main Software Tools Description
+
+From De Paepe: TMM (EdgeR) gives a correction factor for the library size, but the median ratio method (DESeq2) generates a correction factor to apply to the raw counts.
+Based on a summary of fourteen studies comparing normalization methods, the five most recent included both edgeR and DESeq2 in the analysis, and the two packages consistently performed best under specific circumstances, or comparably to others (Li et al. 2020). A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), but an interesting differences are that TMM pre-normalizes raw counts by library size while RLE does not.
+
+## 5. Code Section 2 – Main Analysis
+
+Differential Gene Expression
+``` {r de-edger}
+# EdgeR
+# First constructs a contrast matrix. This step seems most relevant when there are multiple possible contrasts in the complete data set, but as I have only retained naive mice for CON and GF types, it is basically just reformatting the existing design
+ER.CONvsGF <- makeContrasts(CON-GF, levels = ER_des.m)
+class(ER.CONvsGF)
+ER.CONvsGF
+
+# Estimates dispersion by maximizing negative binomial likelihood
+ER_Disp <- estimateDisp(ER_Counts_N, ER_des.m, robust=TRUE)
+
+# EdgeR uses the dispersion to estimate the GLM for each gene
+ER_fit <- glmQLFit(ER_Disp, ER_des.m, robust=TRUE)
+
+#The results are then calculated using the contrast matrix and the GLM fit
+res_ER <- glmQLFTest(ER_fit, contrast = ER.CONvsGF)
+class(res_ER)
+colnames(res_ER$table)
+topTags(res_ER)
+#The top tags are listed by order of lowest p-value
+
+#Identify the top 10 genes by p-value for comparison with the DESeq method
+top_p_ER <- row.names(topTags(res_ER))
+top_p_ER
+```
+
+``` {r de-deseq}
+# DESeq2
+# The first step does the estimation of size factors, dispersion estimate, and GLM fitting all internally, and thus uses the non-normalized dataset as the input. 
+DS.CONvsGF <- DESeq(DS_Counts)
+
+# The results function extracts a results table from the DESeq object
+res_DS <- results(DS.CONvsGF)
+class(res_DS)
+colnames(res_DS)
+
+#Identify the top 10 genes by p-value for comparison with the EdgeR method
+top_p_DS <- row.names(head(res_DS[order(res_DS$pvalue), ], 10))
+top_p_DS
+```
+
+``` {r de-orig}
+# Compare to results from original paper
+# Download results spreadsheet
+#Results_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file", "file=GSE114702_Processed_data_file_2_-_DESeq2_results.xlsx", sep="&")
+#download.file(Results_URL, paste0(dir, "GSE114702_DESeq2_results.xlsx"))
+
+# Locate correct sheet for comparison
+sheets <- excel_sheets(paste0(dir, "GSE114702_DESeq2_results.xlsx"))
+sheets
+res_OG <- read_excel(paste0(dir, "GSE114702_DESeq2_results.xlsx"), sheet = sheets[5], na = "NA")
+# There are a few warnings reading in the spreadsheet that show Excel formatted a number into a date. Comparing the cells with warnings in spreadsheet to the dataframe in R, the cells belong to the "% GC content" variable, and seem to have an expected value R's dataframe. Since this analysis does not use % GC content, I will ignore it, but if it was part of the analysis, I might consider replacing those cells iwth NAs to be safe.
+
+# Check and format results
+class(res_OG)
+res_OG <- as.data.frame(res_OG)
+head(res_OG)
+colnames(res_OG)
+rownames(res_OG) <- res_OG$`Ensembl Gene ID`
+
+sum(is.na(res_OG$padj))
+sum(is.na(res_OG$`Associated Gene Name`))
+sum(is.na(res_OG$log2FoldChange))
+
+#
+top_p_OG <- row.names(head(res_OG[order(res_OG$pvalue), ], 10))
+top_p_OG
+
+```
+
+```{r compare-de}
+top_p_DS_ER <- intersect(top_p_DS, top_p_ER)
+top_p_DS_ER
+
+top_p_OG_DS <- intersect(top_p_OG, top_p_DS)
+top_p_OG_DS
+
+top_p_OG_ER <- intersect(top_p_OG, top_p_ER)
+top_p_OG_ER
+
+top_p_all <- intersect(intersect(top_p_DS, top_p_ER), top_p_OG)
+top_p_all
+#```
+#``` {r is-de}
+#Next the tutorial estimated the false discovery rate. From the documentation, "Identify which genes are significantly differentially expressed from an edgeR fit object containing p-values and test statistics."
+ER_de <- decideTestsDGE(res_ER, p.value = 0.1)
+class(ER_de)
+summary(ER_de)
+#So few! 
+#Say something about padj vs fdr
+```
+
+Visualizations
+Add some stuff from the vs package.
+
+##6. Quality of Visualizations
 
 From assignment details:
+
 20%
+
 "Throughout, ensure that your figures are clear and well labeled. Even for simple figures, such as histograms, ensure that you have accurate, informative axis labels. Also, consider readability, visual appeal, and accessibility. Use well-differentiated colours, and avoid relying upon the red- green spectrum to convey scientifically important information. Remember, you can consider using a combination of colour and symbol/pattern to convey your meaning. The grade in this section is based upon quality and novelty, not having the maximum permissible number of figures. You should have a total of 4-6 figures for your project (excluding the bonus section, should you choose to complete that section)."
 
 
-# 7. Bonus Section (Optional)
+## 7. Bonus Section (Optional)
 
 From the assignment details:
 "An example of a topic that could go here would be benchmarking your analysis for computational speed and/or for accuracy (against comparator tools). Or, you could include supplementary statistical testing (e.g. testing whether your results are sensitive to your analytical choices in your main analysis section). You could also include supplementary visualizations of your choosing."
+
 "The maximum length of this section is 2 pages of your final PDF assignment. Any content above the two-page limit for this section will not be graded. This could consist of prose, commented code, statistical results, and/or visualizations (your choice)."
 
 
-# 8. Results and Discussion
+## 8. Results and Discussion
 
+Can add varet reference here
 From the assignment details:
 "short written section of 2-3 paragraphs: 10%"
 "Paragraph 1: Return to your original question. What is the answer to your question? What did you discover? Were your results as expected or not?"
@@ -87,17 +342,43 @@ From the assignment details:
 interpretation of your results. You may cite references that you also cited in your introduction"
 "At the end, I also encourage you to add an additional short paragraph reflecting upon the process of completing this assignment. What did you learn through completing your project? What lessons will you take forward in your future coursework and career? Reflection can help us to solidify our learning and help us to act upon what we have learned in the future. This additional, optional paragraph is not included in the 3-paragraph length limit for this section."
 
-# 9. Acknowledgements
+## 9. Acknowledgements
 
 Add any necessary acknowledgements here
 
 
-# 10. References
+## 10. References
 
-From the assignment details:
-" I suggest consulting and citing 3-6 papers from the literature to help you to develop your idea and/or interpret your results. Ten papers from the literature is the hard maximum for citations, reflecting that you have other assignments and commitments and to encourage some academics/life balance"
-"Additional citations for vignettes, other tutorials, StackOverflow posts, etc., are not included in the 10-reference limit. You must cite all such sources."
-"You would include scientific references as an in-text citation in the relevant sentence of your assignment, i.e. introduction or discussion (e.g. Xu et al. 2020). Also, list the full reference here at the end. If you used any specific online tutorials or a specific StackOverflow posting, for example, you must also include those here."
+### Academic References
+
+De Paepe
+Li et al
+Maza
+Stilling et al
+Tang et al
+Varet et al
+Wang et al
 
 
+### Coding References
 
+Chen et al
+Love et al
+
+Knitr options:
+https://yihui.org/knitr/options/
+
+estimateDispersions
+https://www.rdocumentation.org/packages/DESeq/versions/1.24.0/topics/estimateDispersions
+
+plot dispersions
+https://rdrr.io/bioc/DESeq2/man/plotDispEsts.html
+
+DESeq2 workflow tutorial
+https://hbctraining.github.io/DGE_workshop/lessons/04_DGE_DESeq2_analysis.html
+
+more plot dispersion stuff:
+http://bioinformatics.sph.harvard.edu/bcbioRNASeq/reference/plotDispEsts.html
+
+pca vs mda from h
+ttps://www.i2tutorials.com/what-is-the-difference-between-multi-dimensional-scaling-and-principal-component-analysis/
