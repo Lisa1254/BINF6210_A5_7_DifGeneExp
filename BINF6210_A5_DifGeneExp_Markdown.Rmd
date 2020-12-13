@@ -1,7 +1,7 @@
 ---
 title: "Methods of Differential Gene Expression Analysis"
 author: "Lisa Hoeg, 1151916"
-date: "BINF6210 A5: due Dec. 11, 2020"
+date: "BINF6210 A5"
 output: pdf_document
 ---
 
@@ -47,6 +47,8 @@ library(gridExtra)
 library(readxl)
 #BiocManager::install("vidger")
 library(vidger)
+#install.packages("pheatmap")
+library(pheatmap)
 ```
 
 ```{r set-dir}
@@ -92,7 +94,7 @@ rownames(res_OG) <- res_OG$`Ensembl Gene ID`
 
 # Check results
 class(res_OG)
-res_OG[1:6,c(1,9,12,13)]
+res_OG[1:6,c(9,12,13)]
 ```
 ```{r replicate-sample}
 # In order to efficiently sample the biological replicates of the groups I wish to work with, I will first define a function to sample a single group at a time, and a companion function to sample all groups at once.
@@ -117,7 +119,7 @@ counts_S_CON_GF <- countdata_mice[,col_S_CON_GF]
 # Check
 colnames(counts_S_CON_GF)
 # Remove variable no longer needed
-rm(col_S_CON_GF)
+rm(col_S_CON_GF, sample_names)
 ```
 
 Create & Explore Data Objects for EdgeR and DESeq2 Packages
@@ -171,7 +173,7 @@ Filtering and Quality Control
 ER_filt_data_def <- filterByExpr(ER_Counts, ER_des.m)
 table(ER_filt_data_def)
 
-# The DESeq2 tutorial filters out genes that have 1 or fewer reads total. The authors describe this only as a pre-filtering step to eliminate empty and nearly empty row, with further filtering occurring downstream.
+# The DESeq2 tutorial filters out genes that have 1 or fewer reads total. The authors describe this only as a pre-filtering step to eliminate empty and nearly empty rows, with further filtering occurring downstream.
 DS_filt_data_def <- rowSums(counts(DS_Counts)) > 1
 table(DS_filt_data_def)
 ```
@@ -180,7 +182,7 @@ table(DS_filt_data_def)
 data.frame("NA" = sum(is.na(res_OG$pvalue)), "DATA" = sum(!is.na(res_OG$pvalue)))
 ```
 ``` {r apply-filter}
-# Since the number of remaining genes in the original paper, `r<sum(!is.na(res_OG$pvalue))>`, is similar to the amount using the recommended filter of the DESeq2 package, `r<sum(rowSums(counts(DS_Counts)) > 1)>`, and quite different from the EdgeR filtering at this stage (`r<sum(filterByExpr(ER_Counts, ER_des.m))>` remaining), I will use the filtering recommeded in the DESeq2 tutorial.
+# Since the number of remaining genes in the original paper, 28039, is similar to the amount using the recommended filter of the DESeq2 package, 23606, and quite different from the EdgeR filtering at this stage (14895 remaining), I will use the filtering recommeded in the DESeq2 tutorial.
 # EdgeR has an internal library sizes variable, so we use the argument keep.lib.sizes = FALSE to reevaluate the library sizes after eliminating some genes.
 # DESeq2 uses the sum of count data, and does not need the argument.
 ER_Counts <- ER_Counts[DS_filt_data_def, , keep.lib.sizes=FALSE]
@@ -188,7 +190,7 @@ DS_Counts <- DS_Counts[DS_filt_data_def, ]
 ```
 
 ``` {r visual-pca}
-# The quality of data can be checked by comparing the relative distances of samples with a Principal Component Analysis (PCA) plot, which visually shows the higher-order distances between samples using transformed data
+# The quality of data can be checked by comparing the relative distances of samples with a Principal Component Analysis (PCA) plot, which visually shows the higher-order distances between samples using transformed data. Variance stabilizing transformation (VST) will be used, as recommended by Love et al.
 # Since only the DESeq2 package provides a function for plotting the PCA, and the counts are identical at this point, I will proceed with the count matrix in the DDS object
 vst_Counts <- vst(DS_Counts, blind = FALSE)
 # Assign PCA data to an object to plot with ggplot
@@ -201,24 +203,7 @@ ggplot(pcaData$data, aes(x = PC1, y = PC2, col = Group)) +
   coord_fixed() +
   ggtitle("PCA with VST data")
 
-# This plot shows that while the GF mice are reasonably well clustered together, there is very little association between the CON samples, and this data may not work well with differential gene expression analysis.
-```
-
-``` {r visual-mds}
-# Say something brief about MDS
-# Set formatting options
-pch_groups <- c(16,17)
-colors_groups <-c("orchid2", "blue")
-
-# MDS visualization for EdgeR
-ER_MDS.out <- plotMDS(ER_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
-legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
-
-# MDS visualization for DESeq2
-#include size factor in object:
-DS_Counts_N <- estimateSizeFactors(DS_Counts)
-DS_MDS.out <- plotMDS(DS_Counts_N, col=colors_groups[group_data], pch=pch_groups[group_data])
-legend("bottom", legend = levels(group_data), pch=pch_groups, col=colors_groups, ncol = 2)
+# This plot shows that there is a definite pattern to the distribution between the GF and CON mice sampled, but the space between the two groups is not too different than the space within each group.
 ```
 
 Library Normalization
@@ -226,17 +211,17 @@ Library Normalization
 # Library size normalization is where the two packages diverge significantly, each using a different statistical method
 # In EdgeR, the default normalization is done by TMM, and the factors are added into the samples feature of the DGEList object
 ER_Counts_N <- calcNormFactors(ER_Counts)
-ER_Counts_N$samples
+head(ER_Counts_N$samples, 4)
 
 # In DESeq2, the default normalization is done as part of the internal process of the DESeq command that determines which genes are differentially expressed. We can still calculate the size factors separately using the "estimateSizeFactorsForMatrix" command, or add to the DESeqDataSet object using the estimateSizeFactors" command.
 
 # DESeq2 uses RLE to estimate size factors
 DS_Counts_Nf <- estimateSizeFactorsForMatrix(counts(DS_Counts))
-DS_Counts_Nf
+head(DS_Counts_Nf, 4)
 
 # EdgeR has an option to specify RLE as the statistical method, but the process is different, so the results will not be the same. I will calculate here for comparison
 ER_Counts_RLE <- calcNormFactors(ER_Counts, method = "RLE")
-ER_Counts_RLE$samples
+head(ER_Counts_RLE$samples, 4)
 ```
 
 Data Visualization
@@ -254,20 +239,23 @@ df_norm_factors <- rbind(df_norm_factors, df_temp)
 rm(df_temp)
 
 ggplot(df_norm_factors, aes(x = lib.size/(10^6), y = norm.factors, col = group)) +
-  geom_point() +
+  geom_point(size = 2) +
+  scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
   labs(x = "Library Size (in millions)", y = "Normalization Factor", title = "Comparison of impact of library size on normalization factors") +
   guides(col = guide_legend("Norm. Method"), group = FALSE) +
   geom_smooth(method = lm, se = FALSE, fullrange = TRUE, linetype = "dashed")
+
+# This plot demonstrates that the internal statistics of normalization in EdgeR do not depend on the size of the library, but DESeq2 does. The two methods within EdgeR are much more similar than the same method (RLE) in the two packages.
 ```
 
 ## 4. Main Software Tools Description
 
-TMM (EdgeR) gives a correction factor for the library size, but the median ratio method (DESeq2) generates a correction factor to apply to the raw counts (De Paepe). A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), but an interesting differences are that TMM pre-normalizes raw counts by library size while RLE does not.
+The default normalization methods of the EdgeR and DESeq2 packages differ in both statistical model, and design on its application. The main difference in process is that DESeq2 generates a correction factor that can be applied to the raw counts because it already accounts for the library size, but EdgeR calculates a correction factor that will be applied to the library size during the differential expression analysis, but does not include the library size in the calculation of the correction factor (De Paepe; Maza; Varet et al.: S1Appendix) . This can be seen in the plot above where the linear regression line for the different statistical normalization methods applied in EdgeR are nearly horizontal, but the correction factor increases with increasing library size for DESeq2. A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), and an in-depth discussion of how the normalization methods differ can be found in the Supplementary Appendix file for Varet et al. (2016). The normalization method can be highly influential on the final results of the differential expression (DE) analysis (Maza), but the statistical model for each package at the DE stage is also different for each package. The underlying principle to each package is the same – a using a negative binomial distribution and the empirical Bayes method—but the application of different tests for differential expression (exact test in EdgeR vs. Walt test in DESeq2) can impact the results (Maza, Wang, De Paepe, Li).
 
 ## 5. Code Section 2 – Main Analysis
 
 Differential Gene Expression
-``` {r de-edger}
+``` {r de-edger, results = "markup"}
 # EdgeR
 # First constructs a contrast matrix. This step seems most relevant when there are multiple possible contrasts in the complete data set, but as I have only retained naive mice for CON and GF types, it is basically just reformatting the existing design
 ER.CONvsGF <- makeContrasts(CON-GF, levels = ER_des.m)
@@ -283,13 +271,13 @@ ER_fit <- glmQLFit(ER_Disp, ER_des.m, robust=TRUE)
 #The results are then calculated using the contrast matrix and the GLM fit
 res_ER <- glmQLFTest(ER_fit, contrast = ER.CONvsGF)
 class(res_ER)
-colnames(res_ER$table)
-topTags(res_ER)
-#The top tags are listed by order of lowest p-value
+#The top tags extracts the 10 genes listed by order of lowest p-value/FDR (False Discovery Rate) and provides some useful statistics
+colnames(topTags(res_ER))
+head(topTags(res_ER), 4)
+
 
 #Identify the top 10 genes by p-value for comparison with the DESeq method
 top_p_ER <- row.names(topTags(res_ER))
-top_p_ER
 ```
 
 ``` {r de-deseq}
@@ -302,79 +290,88 @@ res_DS <- results(DS.CONvsGF)
 class(res_DS)
 colnames(res_DS)
 
-#Identify the top 10 genes by p-value for comparison with the EdgeR method
-top_p_DS <- row.names(head(res_DS[order(res_DS$pvalue), ], 10))
-top_p_DS
+#Identify the top 10 genes by adjusted p-value, which is comparable to EdgeR's FDR for comparison with the EdgeR method
+top_p_DS <- row.names(head(res_DS[order(res_DS$padj), ], 10))
 ```
 
-``` {r de-orig}
-# Compare to results from original paper
-
-
-#
-top_p_OG <- row.names(head(res_OG[order(res_OG$pvalue), ], 10))
-top_p_OG
-
-```
-
-```{r compare-de}
+``` {r de-compare, results = "markup"}
+# Check if same genes had most significant p-values in both packages:
 top_p_DS_ER <- intersect(top_p_DS, top_p_ER)
-top_p_DS_ER
+length(top_p_DS_ER)
+
+# Compare to results from original paper, 
+top_p_OG <- row.names(head(res_OG[order(res_OG$padj), ], 10))
 
 top_p_OG_DS <- intersect(top_p_OG, top_p_DS)
-top_p_OG_DS
+length(top_p_OG_DS)
 
 top_p_OG_ER <- intersect(top_p_OG, top_p_ER)
-top_p_OG_ER
+length(top_p_OG_ER)
 
 top_p_all <- intersect(intersect(top_p_DS, top_p_ER), top_p_OG)
-top_p_all
-#```
-#``` {r is-de}
-#Next the tutorial estimated the false discovery rate. From the documentation, "Identify which genes are significantly differentially expressed from an edgeR fit object containing p-values and test statistics."
-ER_de <- decideTestsDGE(res_ER, p.value = 0.1)
-class(ER_de)
-summary(ER_de)
-#So few! 
-#Say something about padj vs fdr
+length(top_p_all)
+```
+
+``` {r is-de, results = "markup"}
+# The function used to determine differential gene expression in EdgeR allows the p.value cut-off to be changed. I will use 0.1, as that is the value indicated in the original research by Stilling et al. 
+ER_p10 <- decideTestsDGE(res_ER, p.value = 0.1)
+class(ER_p10)
+summary(ER_p10)
+# So few! Only 11
+
+# DESeq2 uses the subset function to apply cutoff values to the p.value or other statistics.
+DS_p10 <- subset(res_DS, padj < 0.1)
+summary(DS_p10)
+# Far more genes were determined to be differentially expressed, total 313
+
+# Original data
+sum(res_OG$padj < 0.1, na.rm = TRUE)
+# 531 met the criteria of the original study.
 ```
 
 Visualizations
-Add some stuff from the vs package.
+``` {r visual-scatter}
+# vidger is a package designed for plots that help interpret gene expression data. The Scatterplot shows the counts per million (CPM) of a pairwise comparison of groups. The closer to the diagonal line, the more similar the counts in the groups, the further from the line, the more different. 
+#The package can be used with a number of popular DE packages, and the raw counts are normalized to CPM in the function, so the raw counts can be used.
+vsScatterPlot(x = "CON", y = "GF", data = ER_Counts, type = "edger")
+# Most genes fall close to the line, with only a few genes showing large differences between the groups.
+```
+``` {r visual-heatmap}
+# To make heatmap I'll subset the combined total of the top 10 most significant p value genes from each package and the original
+df_top_p <- unique(c(top_p_DS, top_p_ER, top_p_OG))
+df_top_p <- data.frame(Gene = df_top_p, DESeq2 = rep("DESeq2", 19), EdgeR = rep("EdgeR", 19), Original = rep("Original", 19))
+df_top_p[!(df_top_p$Gene %in% top_p_DS), "DESeq2"] <- NA
+df_top_p[!(df_top_p$Gene %in% top_p_ER), "EdgeR"] <- NA
+df_top_p[!(df_top_p$Gene %in% top_p_OG), "Original"] <- NA
+rownames(df_top_p) <- df_top_p$Gene
+df_top_p$Gene = NULL
 
-##6. Quality of Visualizations
+# By sampling the count matrix that with VS transformation, the desired genes can be expressed as a heatmap
+mat <- assay(vst_Counts)[rownames(df_top_p), ]
+mat <- mat - rowMeans(mat)
+anno <-colData(vst_Counts)
+anno <- anno$Group
+anno <- data.frame(anno)
+rownames(anno) <- colnames(mat)
+pheatmap(mat, main = "Heatmap of genes with most significant p-values",
+         annotation_col = anno,
+         annotation_row = df_top_p)
 
-From assignment details:
-
-20%
-
-"Throughout, ensure that your figures are clear and well labeled. Even for simple figures, such as histograms, ensure that you have accurate, informative axis labels. Also, consider readability, visual appeal, and accessibility. Use well-differentiated colours, and avoid relying upon the red- green spectrum to convey scientifically important information. Remember, you can consider using a combination of colour and symbol/pattern to convey your meaning. The grade in this section is based upon quality and novelty, not having the maximum permissible number of figures. You should have a total of 4-6 figures for your project (excluding the bonus section, should you choose to complete that section)."
-
+# As expected, the CON mice and GF mice mostly cluster together, with outlier mouse CON.S6 being grouped with the GF mice. It is also interesting that the clustering of the genes shows no particular pattern to the package that identified them.
+```
 
 ## 7. Bonus Section (Optional)
 
-From the assignment details:
-"An example of a topic that could go here would be benchmarking your analysis for computational speed and/or for accuracy (against comparator tools). Or, you could include supplementary statistical testing (e.g. testing whether your results are sensitive to your analytical choices in your main analysis section). You could also include supplementary visualizations of your choosing."
-
-"The maximum length of this section is 2 pages of your final PDF assignment. Any content above the two-page limit for this section will not be graded. This could consist of prose, commented code, statistical results, and/or visualizations (your choice)."
-
-
 ## 8. Results and Discussion
 
-Can add varet reference here
-From the assignment details:
-"short written section of 2-3 paragraphs: 10%"
-"Paragraph 1: Return to your original question. What is the answer to your question? What did you discover? Were your results as expected or not?"
-"Paragraph 2: Briefly describe any key caveats of your study. For example, are the conclusions that can be drawn limited by sample size or any other concerns? Were there biases in data availability that could have impacted your project?"
-"Paragraph 3: What would be the next steps for this research? What would you do next if you had more time and if you were going to develop this work into a larger project? Did your results reveal any interesting preliminary findings that would be worthy of follow-up study?"
-"I suggest that you consider citing 2-4 references in your discussion section to help with
-interpretation of your results. You may cite references that you also cited in your introduction"
-"At the end, I also encourage you to add an additional short paragraph reflecting upon the process of completing this assignment. What did you learn through completing your project? What lessons will you take forward in your future coursework and career? Reflection can help us to solidify our learning and help us to act upon what we have learned in the future. This additional, optional paragraph is not included in the 3-paragraph length limit for this section."
+The EdgeR package found only 11 genes to be significant at a false discovery rate of 0.1, the same cut-off as was applied in the original research, in comparison to the 313 in DESeq2 and 513 in the original study. Since the published study used DESeq2 in their analysis, it was expected that they would be the most similar, but the wide differences between the three results is surprising. Of the 10 genes with the most significant p-value in each process, six were the same between EdgeR and DESeq2, and four were found in both packages and the results table provided by the original authors. This further demonstrates how different packages can produce large discrepancies with small changes in the methodologies. The heatmap of the most significantly different genes grouped the CON and GF mice each together with the exception of one outlier in the CON mice, which was as expected. The other interesting result of the heatmap was that the genes clustering showed that the genes identified by each package were evenly distributed throughout the cluster, suggesting that statistical models used in each package are not producing a strong bias of a single type.  
+Although the comparison between packages for differential gene expression showed quite different results of which genes were considered differentially expressed, with EdgeR being much more conservative in its estimation, the scatterplot of normalized counts for the two groups shows that the divergence of most genes from the centre diagonal is minimal. This suggests that the statistical difference between which genes in my sample that would or would not be considered differentially expressed is quite sensitive. As such, the differences between the packages is not as surprising as was first believed.  
+My study subsampled the original data to only use 4 of the biological replicates each of the original study which had data for 8 mice in the CON-social condition, and 12 mice in the GF-social condition. The agreement between the packages studied and the original study might have been improved by including all of the same biological replicates that the study did. Interestingly, Li et al. found that either normalization method (TMM or RLE) performed better at differential expression analysis on their simulated data with small sample sizes by using EdgeR’s Exact test than with DESeq’s Wald test, which performed best at large samples sizes. Although identifying more genes in my analysis does not on its own make DESeq2 the better tool, but it’s closer approximation to the original study supports that conclusion, which suggests that my study demonstrated the opposite results from Li et al.’s study.
+
 
 ## 9. Acknowledgements
 
-Add any necessary acknowledgements here
-
+All work was done independently, referencing lecture material, vignettes, and online documentation as listed in the references below.
 
 ## 10. References
 
@@ -392,6 +389,8 @@ Add any necessary acknowledgements here
   
    Tang, M, Sun, J, Shimizu, K, Kadota, K. (2015). Evaluation of methods for differential expression analysis on multi-group RNA-seq count data. *BMC Bioinformatics*, 16:361. https://doi.org/10.1186/s12859-015-0794-7  
 
+  Varet, H, Brillet-Guéguen, L, Coppée, J-Y, Dillies, M-A. (2016). SARTools: A DESeq2- and EdgeR-Based R Pipeline for Comprehensive Differential Analysis of RNA-Seq Data. *PloS One*, 11(6), e0157022. https://doi.org/10.1371/journal.pone.0157022  
+
    Wang, T, Li, B, Nelson, CE, Nabavi, S. (2019). Comparative analysis of differential gene expression analysis tools for single-cell RNA sequencing data. *BMC Bioinformatics*, 20:40. https://doi.org/10.1186/s12859-019-2599-6
 
 
@@ -401,21 +400,11 @@ Add any necessary acknowledgements here
 
    Love, MI, Anders, S, Kim, V, Huber, W. (2015). RNA-Seq workflow: gene-level exploratory analysis and differential expression. *F1000 Research, 4*, 1070. https://doi.org/10.12688/f1000research.7035.1  
 
-
-Knitr options:
+Pheatmap documentation (Greg Finak):  
+https://www.rdocumentation.org/packages/COMPASS/versions/1.10.2/topics/pheatmap
+  
+Knitr options (Yihui Xie):  
 https://yihui.org/knitr/options/
-
-estimateDispersions
-https://www.rdocumentation.org/packages/DESeq/versions/1.24.0/topics/estimateDispersions
-
-plot dispersions
-https://rdrr.io/bioc/DESeq2/man/plotDispEsts.html
-
-DESeq2 workflow tutorial
+  
+DESeq2 workflow tutorial (hbctraining):  
 https://hbctraining.github.io/DGE_workshop/lessons/04_DGE_DESeq2_analysis.html
-
-more plot dispersion stuff:
-http://bioinformatics.sph.harvard.edu/bcbioRNASeq/reference/plotDispEsts.html
-
-pca vs mda from h
-ttps://www.i2tutorials.com/what-is-the-difference-between-multi-dimensional-scaling-and-principal-component-analysis/
