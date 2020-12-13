@@ -1,5 +1,6 @@
 ---
-title: "Methods of Differential Gene Expression Analysis"
+title: "Differential Gene Expression Analysis"
+subtitle: "EdgeR & DESeq2 Comparison"
 author: "Lisa Hoeg, 1151916"
 date: "BINF6210 A5"
 output: pdf_document
@@ -12,9 +13,9 @@ knitr::opts_chunk$set(tidy = TRUE, tidy.opts=list(width.cutoff=88))
 
 ## 1. Introduction
 
-  For this assignment, I am choosing option 7, which explores differential gene expression. There are many software packages and pipelines, such as voom-limma, baySeq, and Cufflinks, as have been extensively compared each showing their own strengths and best circumstances for use (Li et al. 2020). Even more packages are being developed to specialize the statistics and algorithms to single-cell RNA-seq data’s unique considerations like increased zero read counts, but at this stage of development, analytic tools developed for bulk RNA-seq data such as DESeq2 and EdgeR perform comparably well (Wang et al. 2019). The abundance of available choices can be quite overwhelming to a new user. Based on a summary of fourteen studies comparing normalization methods, the five most recent included both edgeR and DESeq2 in the analysis, and the two packages consistently performed best under specific circumstances, or comparably to others (Li et al. 2020). As they seem consistently popular and well performing, I will be comparing EdgeR and DESeq, both of which had tutorials listed in the helpul links section of the assignment details (Chen et al.; Love et al.).  
+  For this assignment, I am choosing option 7, which explores differential gene expression. There are many software packages and pipelines, such as voom-limma, baySeq, and Cufflinks, as have been extensively compared each showing their own strengths and best circumstances for use (Li et al. 2020). Even more packages are being developed to specialize the statistics and algorithms to single-cell RNA-seq data’s unique considerations like increased zero read counts, but at this stage of development, analytic tools developed for bulk RNA-seq data such as DESeq2 and EdgeR perform comparably well (Wang et al. 2019). The abundance of available choices can be quite overwhelming to a new user. Based on a summary of fourteen studies comparing normalization methods, the five most recent included both edgeR and DESeq2 in the analysis, and the two packages consistently performed best under specific circumstances, or comparably to others (Li et al. 2020). As they seem consistently popular and well performing, I will be comparing EdgeR and DESeq, both of which had tutorials listed in the helpul links section of the assignment details (Chen et al. 2016; Love et al. 2015).  
     
-  The main steps in differential gene expression analysis, in their simplest terms, are processing sequencing data into a count matrix, normalization of library sizes, and analysis of normalized counts. Each step in the process relies on certain statistical assumptions for the best way to process the data. I will begin analysis with the count matrix already constructed from an experiment uploaded to Gene Expression Omnibus (GEO). For normalization methods, EdgeR uses “Trimmed Mean of M-values” (TMM), and DESeq2 uses “Relative Log Expression” (RLE) (Maza). Both edgeR and DESeq2 use an negative binomial distribution for the modeling of gene expression, but they diverge again at their test for differential expression, with EdgeR using the Exact test, and DESeq2 using a Wald test (De Paepe, 2014-2015; Tang et al. 2015). 
+  The main steps in differential gene expression analysis, in their simplest terms, are processing sequencing data into a count matrix, normalization of library sizes, and analysis of normalized counts. Each step in the process relies on certain statistical assumptions for the best way to process the data. I will begin analysis with the count matrix already constructed from an experiment uploaded to Gene Expression Omnibus (GEO). For normalization methods, EdgeR uses “Trimmed Mean of M-values” (TMM), and DESeq2 uses “Relative Log Expression” (RLE) (Maza 2016). Both edgeR and DESeq2 use an negative binomial distribution for the modeling of gene expression, but they diverge again at their test for differential expression, with EdgeR using the Exact test, and DESeq2 using a Wald test (De Paepe, 2014-2015; Tang et al. 2015). 
     
   To contribute to the ongoing community discussion of the relative merits of different gene expression packages, I will use the default statistical settings within each package when options exist, but otherwise keep filtering and processing of the data within each package whenever possible. The end goal is to produce an assessment of which package’s statistical method, with specific reference to which results are most liberal or conservative in it’s estimation of differentially expressed genes, and which package produces the most similar results to the original author’s published analysis.
 
@@ -32,7 +33,7 @@ Count data was downloaded from GEO on 11/24/2020, and the results matrix was dow
 Preliminary Set-up & Data Acquisition
 
 ``` {r libraries}
-# All libraries were loaded at the beginning of the script for efficient organization.
+# All libraries were loaded at the beginning of the script for efficient organization.  
 #install.packages("stringr")
 library(stringr)
 #BiocManager::install("edgeR")
@@ -52,9 +53,8 @@ library(pheatmap)
 ```
 
 ```{r set-dir}
-# A variable, "dir" is used to define the working directory
-# Keeping this here for now, before submitting delete this comment and change to empty string: ""
-# User can specify directory here for downloading and saving files, or leave empty
+# A variable, "dir" is used to define the working directory  
+# User can specify directory here for downloading and saving files, or leave empty (dir = "")
 dir <- "/Users/lisa/Documents/Bioinformatics/6210/A5/scripts_data/a5_data/"
 ```
 
@@ -62,7 +62,7 @@ dir <- "/Users/lisa/Documents/Bioinformatics/6210/A5/scripts_data/a5_data/"
 # Download count file with these two commands
 # Count_URL <- paste("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE114702", "format=file",
 #"file=GSE114702_HTSeq_gene_counts.txt.gz", sep="&")
-#Let user specify save name for file:
+#Let user specify save name for file:  
 count_file <- "GSE114702_HTSeq_gene_counts.txt.gz"
 # download.file(Count_URL, paste0(dir, count_file))
 
@@ -83,8 +83,8 @@ countdata_mice[1:5, c(1,6,18,30)]
 res_file <- "GSE114702_DESeq2_results.xlsx"
 #download.file(Results_URL, paste0(dir, res_file)
 
-# If unsure which sheet, can check list:
-#sheets <- excel_sheets(paste0(dir, res_file))
+# If unsure which sheet, can check list:  
+#sheets <- excel_sheets(paste0(dir, res_file))  
 #sheets
 res_OG <- read_excel(paste0(dir, res_file), sheet = "CONsi-GFsi", na = "NA")
 # There are a few warnings reading in the spreadsheet that show Excel formatted a number into a date. Comparing the cells with warnings in spreadsheet to the dataframe in R, the cells belong to the "% GC content" variable, and seem to have an expected value R's dataframe. Since this analysis does not use % GC content, I will ignore it, but if it was part of the analysis, I might consider replacing those cells with NAs to be safe.
@@ -227,16 +227,9 @@ head(ER_Counts_RLE$samples, 4)
 Data Visualization
 ``` {r visual-norm-factors}
 # To compare different normalization methods make dataframe of library size and normalization factors to pass to ggplot
-# Still need to update labels and stuff
-
-df_norm_factors <- ER_Counts_N$samples
-df_norm_factors$group <- "TMM(edgeR)"
-df_temp <- ER_Counts_RLE$samples
-df_temp$group <- "RLE(edgeR)"
-df_norm_factors <- rbind(df_norm_factors, df_temp)
-df_temp <- data.frame(group = rep("RLE(DESeq2)", 8), lib.size = colSums(counts(DS_Counts)), norm.factors = DS_Counts_Nf)
-df_norm_factors <- rbind(df_norm_factors, df_temp)
-rm(df_temp)
+df_norm_factors <- rbind(ER_Counts_N$samples, ER_Counts_RLE$samples, data.frame(group = rep("RLE(DESeq2)", 8), lib.size = colSums(counts(DS_Counts)), norm.factors = DS_Counts_Nf))
+df_norm_factors$group <- unfactor(df_norm_factors$group)
+df_norm_factors$group[1:16] <- c(rep("TMM(edgeR)", 8), rep("RLE(edgeR)", 8))
 
 ggplot(df_norm_factors, aes(x = lib.size/(10^6), y = norm.factors, col = group)) +
   geom_point(size = 2) +
@@ -250,7 +243,7 @@ ggplot(df_norm_factors, aes(x = lib.size/(10^6), y = norm.factors, col = group))
 
 ## 4. Main Software Tools Description
 
-The default normalization methods of the EdgeR and DESeq2 packages differ in both statistical model, and design on its application. The main difference in process is that DESeq2 generates a correction factor that can be applied to the raw counts because it already accounts for the library size, but EdgeR calculates a correction factor that will be applied to the library size during the differential expression analysis, but does not include the library size in the calculation of the correction factor (De Paepe; Maza; Varet et al.: S1Appendix) . This can be seen in the plot above where the linear regression line for the different statistical normalization methods applied in EdgeR are nearly horizontal, but the correction factor increases with increasing library size for DESeq2. A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), and an in-depth discussion of how the normalization methods differ can be found in the Supplementary Appendix file for Varet et al. (2016). The normalization method can be highly influential on the final results of the differential expression (DE) analysis (Maza), but the statistical model for each package at the DE stage is also different for each package. The underlying principle to each package is the same – a using a negative binomial distribution and the empirical Bayes method—but the application of different tests for differential expression (exact test in EdgeR vs. Walt test in DESeq2) can impact the results (Maza, Wang, De Paepe, Li).
+The default normalization methods of the EdgeR and DESeq2 packages differ in both statistical model, and design on its application. The main difference in process is that DESeq2 generates a correction factor that can be applied to the raw counts because it already accounts for the library size, but EdgeR calculates a correction factor that will be applied to the library size during the differential expression analysis, but does not include the library size in the calculation of the correction factor (De Paepe 2014-2015; Maza 2016; Varet et al.: S1Appendix 2016) . This can be seen in the plot above where the linear regression line for the different statistical normalization methods applied in EdgeR are nearly horizontal, but the correction factor increases with increasing library size for DESeq2. A thorough exploration of the steps and corresponding mathematics for each method can be found in Maza (2016), and an in-depth discussion of how the normalization methods differ can be found in the Supplementary Appendix file for Varet et al. (2016). The normalization method can be highly influential on the final results of the differential expression (DE) analysis (Maza 2016), but the statistical model for each package at the DE stage is also different for each package. The underlying principle to each package is the same – a using a negative binomial distribution and the empirical Bayes method—but the application of different tests for differential expression (exact test in EdgeR vs. Walt test in DESeq2) can impact the results (Maza 2016; Wang 2019; De Paepe 2014-2015; Li 2020).
 
 ## 5. Code Section 2 – Main Analysis
 
@@ -270,11 +263,10 @@ ER_fit <- glmQLFit(ER_Disp, ER_des.m, robust=TRUE)
 
 #The results are then calculated using the contrast matrix and the GLM fit
 res_ER <- glmQLFTest(ER_fit, contrast = ER.CONvsGF)
+
 class(res_ER)
 #The top tags extracts the 10 genes listed by order of lowest p-value/FDR (False Discovery Rate) and provides some useful statistics
-colnames(topTags(res_ER))
 head(topTags(res_ER), 4)
-
 
 #Identify the top 10 genes by p-value for comparison with the DESeq method
 top_p_ER <- row.names(topTags(res_ER))
@@ -336,37 +328,41 @@ Visualizations
 vsScatterPlot(x = "CON", y = "GF", data = ER_Counts, type = "edger")
 # Most genes fall close to the line, with only a few genes showing large differences between the groups.
 ```
-``` {r visual-heatmap}
+``` {r visual-heatmap, results = "markup"}
 # To make heatmap I'll subset the combined total of the top 10 most significant p value genes from each package and the original
-df_top_p <- unique(c(top_p_DS, top_p_ER, top_p_OG))
-df_top_p <- data.frame(Gene = df_top_p, DESeq2 = rep("DESeq2", 19), EdgeR = rep("EdgeR", 19), Original = rep("Original", 19))
-df_top_p[!(df_top_p$Gene %in% top_p_DS), "DESeq2"] <- NA
-df_top_p[!(df_top_p$Gene %in% top_p_ER), "EdgeR"] <- NA
-df_top_p[!(df_top_p$Gene %in% top_p_OG), "Original"] <- NA
-rownames(df_top_p) <- df_top_p$Gene
-df_top_p$Gene = NULL
+# Sampling the count matrix that with VS transformation & difference from gene's mean count
+top_p_full <- unique(c(top_p_DS, top_p_ER, top_p_OG))
+vst_top_Counts <- assay(vst_Counts)[top_p_full, ]
+vst_top_Counts <- vst_top_Counts - rowMeans(vst_top_Counts)
 
-# By sampling the count matrix that with VS transformation, the desired genes can be expressed as a heatmap
-mat <- assay(vst_Counts)[rownames(df_top_p), ]
-mat <- mat - rowMeans(mat)
-anno <-colData(vst_Counts)
-anno <- anno$Group
-anno <- data.frame(anno)
-rownames(anno) <- colnames(mat)
-pheatmap(mat, main = "Heatmap of genes with most significant p-values",
-         annotation_col = anno,
+# Make dataframe for column annotations
+group_anno <- data.frame(Group = unfactor(group_data))
+rownames(group_anno) <- colnames(vst_top_Counts)
+
+# Make dataframe for row annotations
+df_top_p <- data.frame(DESeq2 = rep("DESeq2", 19), EdgeR = rep("EdgeR", 19), Original = rep("Original", 19))
+rownames(df_top_p) <- top_p_full
+df_top_p[!(rownames(df_top_p) %in% top_p_DS), "DESeq2"] <- NA
+df_top_p[!(rownames(df_top_p) %in% top_p_ER), "EdgeR"] <- NA
+df_top_p[!(rownames(df_top_p) %in% top_p_OG), "Original"] <- NA
+
+# Check
+head(df_top_p, 4)
+
+# Heatmap
+pheatmap(vst_top_Counts, main = "Heatmap of genes with most significant p-values",
+         annotation_col = group_anno,
          annotation_row = df_top_p)
 
 # As expected, the CON mice and GF mice mostly cluster together, with outlier mouse CON.S6 being grouped with the GF mice. It is also interesting that the clustering of the genes shows no particular pattern to the package that identified them.
 ```
 
-## 7. Bonus Section (Optional)
 
 ## 8. Results and Discussion
 
 The EdgeR package found only 11 genes to be significant at a false discovery rate of 0.1, the same cut-off as was applied in the original research, in comparison to the 313 in DESeq2 and 513 in the original study. Since the published study used DESeq2 in their analysis, it was expected that they would be the most similar, but the wide differences between the three results is surprising. Of the 10 genes with the most significant p-value in each process, six were the same between EdgeR and DESeq2, and four were found in both packages and the results table provided by the original authors. This further demonstrates how different packages can produce large discrepancies with small changes in the methodologies. The heatmap of the most significantly different genes grouped the CON and GF mice each together with the exception of one outlier in the CON mice, which was as expected. The other interesting result of the heatmap was that the genes clustering showed that the genes identified by each package were evenly distributed throughout the cluster, suggesting that statistical models used in each package are not producing a strong bias of a single type.  
-Although the comparison between packages for differential gene expression showed quite different results of which genes were considered differentially expressed, with EdgeR being much more conservative in its estimation, the scatterplot of normalized counts for the two groups shows that the divergence of most genes from the centre diagonal is minimal. This suggests that the statistical difference between which genes in my sample that would or would not be considered differentially expressed is quite sensitive. As such, the differences between the packages is not as surprising as was first believed.  
-My study subsampled the original data to only use 4 of the biological replicates each of the original study which had data for 8 mice in the CON-social condition, and 12 mice in the GF-social condition. The agreement between the packages studied and the original study might have been improved by including all of the same biological replicates that the study did. Interestingly, Li et al. found that either normalization method (TMM or RLE) performed better at differential expression analysis on their simulated data with small sample sizes by using EdgeR’s Exact test than with DESeq’s Wald test, which performed best at large samples sizes. Although identifying more genes in my analysis does not on its own make DESeq2 the better tool, but it’s closer approximation to the original study supports that conclusion, which suggests that my study demonstrated the opposite results from Li et al.’s study.
+Although the comparison between packages for differential gene expression showed quite different results of which genes were considered differentially expressed, with EdgeR being much more conservative in its estimation, the scatterplot of normalized counts for the two groups shows that the divergence of most genes from the centre diagonal is minimal. This suggests that the statistical difference between which genes in my sample that would or would not be considered differentially expressed is quite sensitive (McDermaid et al. 2019). As such, the differences between the packages is not as surprising as was first believed.  
+My study subsampled the original data to only use 4 of the biological replicates each of the original study which had data for 8 mice in the CON-social condition, and 12 mice in the GF-social condition. The agreement between the packages studied and the original study might have been improved by including all of the same biological replicates that the study did. Interestingly, Li et al. (2020) found that either normalization method (TMM or RLE) performed better at differential expression analysis on their simulated data with small sample sizes by using EdgeR’s Exact test than with DESeq’s Wald test, which performed best at large samples sizes. Although identifying more genes in my analysis does not on its own make DESeq2 the better tool, but it’s closer approximation to the original study supports that conclusion, which suggests that my study demonstrated the opposite results from Li et al.’s study (2020).
 
 
 ## 9. Acknowledgements
@@ -408,3 +404,6 @@ https://yihui.org/knitr/options/
   
 DESeq2 workflow tutorial (hbctraining):  
 https://hbctraining.github.io/DGE_workshop/lessons/04_DGE_DESeq2_analysis.html
+  
+vidger R package documentation (Brandon Monier):  
+https://www.bioconductor.org/packages/release/bioc/manuals/vidger/man/vidger.pdf
