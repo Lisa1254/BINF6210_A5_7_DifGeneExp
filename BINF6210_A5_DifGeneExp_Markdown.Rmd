@@ -55,7 +55,7 @@ library(pheatmap)
 ```{r set-dir}
 # A variable, "dir" is used to define the working directory  
 # User can specify directory here for downloading and saving files, or leave empty (dir = "")
-dir <- "/Users/lisa/Documents/Bioinformatics/6210/A5/scripts_data/a5_data/"
+dir <- "/Users/lisa/Documents/Bioinformatics/1-F2020/6210/A5/scripts_data/a5_data/"
 ```
 
 ```{r load-count-data}
